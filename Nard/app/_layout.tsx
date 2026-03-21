@@ -21,7 +21,7 @@ export default function RootLayout() {
 
                     {/* רישום מסך ההגדרות - זה מה שהיה חסר */}
                     <Stack.Screen
-                        name="settingsScreen"
+                        name="settings"
                         options={{ title: 'הגדרות', presentation: 'card' }}
                     />
 
