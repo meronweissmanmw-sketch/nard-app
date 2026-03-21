@@ -11,7 +11,7 @@ A React Native / Expo app for creating engineering inspection reports.
 ```bash
 # 1. Clone this repository
 git clone https://github.com/meronweissmanmw-sketch/nard-app.git
-cd nard-app/Nard
+cd nard-app
 
 # 2. Install dependencies
 npm install
@@ -30,26 +30,25 @@ Then:
 ## 📁 Project structure
 
 ```
-nard-app/
+nard-app/                    ← repo root — open this folder in VS Code / terminal
 ├── Nard.slnx               Visual Studio solution (open this in VS 2026)
-└── Nard/                   The Expo project — open this folder in VS Code
-    ├── nard.esproj          Visual Studio JS project file
-    ├── package.json         npm dependencies
-    ├── app.json             Expo configuration
-    ├── tsconfig.json        TypeScript configuration
-    ├── babel.config.js      Babel configuration
-    ├── ProjectContext.tsx   Shared state (projects, createNewProject, addProjectItem)
-    ├── assets/              App icons and splash screen
-    └── app/                 All screens (expo-router file-based routing)
-        ├── _layout.tsx      Root navigation layout
-        ├── index.tsx        Home — list of all projects
-        ├── new-project.tsx  Create a project (buildings / floors / parking)
-        ├── project-details.tsx  Project detail — list reports, export Word doc
-        ├── editor.tsx       Walk Mode — capture defects floor by floor
-        ├── review.tsx       Review Mode — read and edit all captured defects
-        ├── camera.tsx       Full-screen camera for photographing defects
-        ├── modal.tsx        Quick "new report" modal
-        └── settings.tsx     App settings (default subject, notes, logo)
+├── nard.esproj             Visual Studio JS project file
+├── package.json            npm dependencies
+├── app.json                Expo configuration
+├── tsconfig.json           TypeScript configuration
+├── babel.config.js         Babel configuration
+├── ProjectContext.tsx      Shared state (projects, createNewProject, addProjectItem)
+├── assets/                 App icons and splash screen
+└── app/                    All screens (expo-router file-based routing)
+    ├── _layout.tsx         Root navigation layout
+    ├── index.tsx           Home — list of all projects
+    ├── new-project.tsx     Create a project (buildings / floors / parking)
+    ├── project-details.tsx Project detail — list reports, export Word doc
+    ├── editor.tsx          Walk Mode — capture defects floor by floor
+    ├── review.tsx          Review Mode — read and edit all captured defects
+    ├── camera.tsx          Full-screen camera for photographing defects
+    ├── modal.tsx           Quick "new report" modal
+    └── settings.tsx        App settings (default subject, notes, logo)
 ```
 
 ---
@@ -65,8 +64,8 @@ nard-app/
 ## 💻 Opening in VS Code (same Copilot experience as VS 2026)
 
 ```bash
-# Open the Nard/ folder in VS Code
-cd nard-app/Nard
+# Open the repo root in VS Code
+cd nard-app
 code .
 ```
 
