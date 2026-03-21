@@ -26,6 +26,11 @@ export default function RootLayout() {
                     />
 
                     <Stack.Screen
+                        name="review"
+                        options={{ title: 'סקירת ליקויים', headerShown: false }}
+                    />
+
+                    <Stack.Screen
                         name="camera"
                         options={{ headerShown: false, presentation: 'fullScreenModal' }}
                     />
