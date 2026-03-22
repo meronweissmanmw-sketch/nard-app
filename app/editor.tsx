@@ -269,6 +269,14 @@ export default function EditorScreen() {
             });
         }
 
+        // General comment (הערה כללית) - appears above all buildings
+        tree.push({
+            type: 'floor',
+            label: 'הערה כללית',
+            fullLocation: 'הערה כללית',
+            id: 'general-comment'
+        });
+
         // Buildings (main floors)
         (structure?.buildings || []).forEach((b: any, bIdx: number) => {
             const bKey = b.id ?? `b${bIdx}`;
@@ -963,7 +971,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#34C759'
     },
-    modalSavedText: { color: '#34C759', fontSize: 16, fontWeight: '700', marginLeft: 8 }
+    modalSavedText: { color: '#34C759', fontSize: 16, fontWeight: '700', marginLeft: 8 },
 });
 
 
