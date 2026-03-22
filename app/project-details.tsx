@@ -234,8 +234,8 @@ export default function ProjectDetailsScreen() {
                     rows: [
                         makeRow('מיקום:', it.location || '', true),
                         makeRow('אחראי:', it.assignedTo || '', false),
-                        makeRow('סטטוס:', STATUS_CONFIG[it.status || 'open']?.label || 'פתוח', true),
-                        makeRow('עדיפות:', PRIORITY_CONFIG[it.priority || 'medium']?.label || 'בינוני', false),
+                        makeRow('סטטוס:', STATUS_CONFIG[it.status || 'open']?.label ?? STATUS_CONFIG.open.label, true),
+                        makeRow('עדיפות:', PRIORITY_CONFIG[it.priority || 'medium']?.label ?? PRIORITY_CONFIG.medium.label, false),
                         makeRow('הערות:', it.notes || '', true),
                     ],
                 }));

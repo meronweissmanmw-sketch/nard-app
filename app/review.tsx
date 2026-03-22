@@ -338,7 +338,7 @@ export default function ReviewScreen() {
                                                 const s = STATUS_CONFIG[liveItem.status || 'open'];
                                                 return <View style={{ backgroundColor: s.bg, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 }}><Text style={{ color: s.color, fontSize: 11, fontWeight: '600' }}>{s.label}</Text></View>;
                                             })()}
-                                            {liveItem.priority && liveItem.priority !== 'medium' && (() => {
+                                            {liveItem.priority && liveItem.priority !== 'medium' && PRIORITY_CONFIG[liveItem.priority] && (() => {
                                                 const p = PRIORITY_CONFIG[liveItem.priority];
                                                 return <View style={{ backgroundColor: p.bg, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 }}><Text style={{ color: p.color, fontSize: 11, fontWeight: '600' }}>{p.label}</Text></View>;
                                             })()}
