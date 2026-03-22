@@ -8,6 +8,19 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+    open: { label: 'פתוח', color: '#FF3B30', bg: '#FFE5E5' },
+    in_progress: { label: 'בטיפול', color: '#FF9500', bg: '#FFF3E0' },
+    fixed: { label: 'טופל', color: '#34C759', bg: '#E8F9EE' },
+};
+
+const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+    critical: { label: 'קריטי', color: '#CC0000', bg: '#FFE5E5' },
+    high: { label: 'גבוה', color: '#FF3B30', bg: '#FFF0F0' },
+    medium: { label: 'בינוני', color: '#FF9500', bg: '#FFF8E1' },
+    low: { label: 'נמוך', color: '#34C759', bg: '#F0FFF4' },
+};
+
 // קבועים עבור חישובי גובה - קריטי למניעת קריסות באנדרואיד
 const HEADER_HEIGHT = 40; // reduced header height to save space
 const FLOOR_HEIGHT = 36; // sticky floor / region height
@@ -40,6 +53,8 @@ export default function EditorScreen() {
     const [modalAssignedTo, setModalAssignedTo] = useState('');
     const [modalSaved, setModalSaved] = useState(false);
     const [modalSerial, setModalSerial] = useState<number | null>(null);
+    const [modalStatus, setModalStatus] = useState<string>('open');
+    const [modalPriority, setModalPriority] = useState<string>('medium');
     const [pendingModalItemId, setPendingModalItemId] = useState<string | null>(null);
 
     const formatFloorPath = (path: string) => {
@@ -72,6 +87,8 @@ export default function EditorScreen() {
         setModalItem(item);
         setModalNotes(item.notes || '');
         setModalAssignedTo(item.assignedTo || '');
+        setModalStatus(item.status || 'open');
+        setModalPriority(item.priority || 'medium');
         setModalSaved(false);
         // Compute serial once so it doesn't re-run findIndex on every render
         const serial = report?.items
@@ -83,9 +100,9 @@ export default function EditorScreen() {
 
     const saveDefectModal = async () => {
         if (!modalItem) return;
-        await persistItemField(modalItem.id, { notes: modalNotes, assignedTo: modalAssignedTo });
+        await persistItemField(modalItem.id, { notes: modalNotes, assignedTo: modalAssignedTo, status: modalStatus, priority: modalPriority, images: modalItem.images });
         // refresh modal item with updated data
-        setModalItem((prev: any) => ({ ...prev, notes: modalNotes, assignedTo: modalAssignedTo }));
+        setModalItem((prev: any) => ({ ...prev, notes: modalNotes, assignedTo: modalAssignedTo, status: modalStatus, priority: modalPriority }));
         setModalSaved(true);
         setTimeout(() => {
             setDefectModalVisible(false);
@@ -204,7 +221,7 @@ export default function EditorScreen() {
         router.push(url as any);
     };
 
-    const persistItemField = async (itemId: string, fields: Partial<{ notes: string; assignedTo: string; images: string[]; location: string }>) => {
+    const persistItemField = async (itemId: string, fields: Partial<{ notes: string; assignedTo: string; images: string[]; location: string; status: string; priority: string }>) => {
         try {
             const data = await AsyncStorage.getItem('projects');
             if (!data) return;
@@ -559,6 +576,16 @@ export default function EditorScreen() {
                                     ? <Text style={styles.compactDefectNotes} numberOfLines={1}>{liveItem.notes}</Text>
                                     : <Text style={styles.compactDefectNoNotes}>לחץ עריכה להוספת פרטים</Text>
                                 }
+                                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4, gap: 6 }}>
+                                    {(() => {
+                                        const s = STATUS_CONFIG[liveItem.status || 'open'];
+                                        return <View style={{ backgroundColor: s.bg, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}><Text style={{ color: s.color, fontSize: 11, fontWeight: '600' }}>{s.label}</Text></View>;
+                                    })()}
+                                    {(() => {
+                                        const p = PRIORITY_CONFIG[liveItem.priority || 'medium'];
+                                        return <View style={{ backgroundColor: p.bg, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}><Text style={{ color: p.color, fontSize: 11, fontWeight: '600' }}>{p.label}</Text></View>;
+                                    })()}
+                                </View>
                             </View>
                         );
                     }
@@ -688,12 +715,63 @@ export default function EditorScreen() {
                                     textAlign="right"
                                 />
 
+                                <Text style={styles.modalFieldLabel}>סטטוס:</Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 12, gap: 8 }}>
+                                    {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
+                                        <TouchableOpacity
+                                            key={key}
+                                            onPress={() => setModalStatus(key)}
+                                            style={{
+                                                backgroundColor: modalStatus === key ? cfg.bg : '#F2F2F7',
+                                                borderRadius: 16,
+                                                paddingHorizontal: 14,
+                                                paddingVertical: 7,
+                                                borderWidth: 2,
+                                                borderColor: modalStatus === key ? cfg.color : 'transparent',
+                                            }}
+                                        >
+                                            <Text style={{ color: modalStatus === key ? cfg.color : '#8E8E93', fontWeight: '600', fontSize: 13 }}>{cfg.label}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+
+                                <Text style={styles.modalFieldLabel}>עדיפות:</Text>
+                                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+                                    {Object.entries(PRIORITY_CONFIG).map(([key, cfg]) => (
+                                        <TouchableOpacity
+                                            key={key}
+                                            onPress={() => setModalPriority(key)}
+                                            style={{
+                                                backgroundColor: modalPriority === key ? cfg.bg : '#F2F2F7',
+                                                borderRadius: 16,
+                                                paddingHorizontal: 14,
+                                                paddingVertical: 7,
+                                                borderWidth: 2,
+                                                borderColor: modalPriority === key ? cfg.color : 'transparent',
+                                            }}
+                                        >
+                                            <Text style={{ color: modalPriority === key ? cfg.color : '#8E8E93', fontWeight: '600', fontSize: 13 }}>{cfg.label}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+
                                 {modalItem.images && modalItem.images.length > 0 && (
                                     <>
                                         <Text style={styles.modalFieldLabel}>תמונות ({modalItem.images.length}):</Text>
                                         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
                                             {modalItem.images.map((uri: string, i: number) => (
-                                                <Image key={i} source={{ uri }} style={styles.modalImage} />
+                                                <View key={i} style={{ position: 'relative', marginRight: 8 }}>
+                                                    <Image source={{ uri }} style={styles.modalImage} />
+                                                    <TouchableOpacity
+                                                        onPress={() => {
+                                                            const newImages = modalItem.images.filter((_: string, idx: number) => idx !== i);
+                                                            setModalItem((prev: any) => ({ ...prev, images: newImages }));
+                                                        }}
+                                                        style={{ position: 'absolute', top: 2, right: 2, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 10, width: 20, height: 20, justifyContent: 'center', alignItems: 'center' }}
+                                                    >
+                                                        <Text style={{ color: '#fff', fontSize: 12, fontWeight: 'bold', lineHeight: 16 }}>✕</Text>
+                                                    </TouchableOpacity>
+                                                </View>
                                             ))}
                                         </ScrollView>
                                     </>

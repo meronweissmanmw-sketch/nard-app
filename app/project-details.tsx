@@ -9,6 +9,19 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, ImageRun, Table, TableRow, TableCell, Header, AlignmentType, WidthType, BorderStyle } from 'docx';
 import { Buffer } from 'buffer';
 
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+    open: { label: 'פתוח', color: '#FF3B30', bg: '#FFE5E5' },
+    in_progress: { label: 'בטיפול', color: '#FF9500', bg: '#FFF3E0' },
+    fixed: { label: 'טופל', color: '#34C759', bg: '#E8F9EE' },
+};
+
+const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+    critical: { label: 'קריטי', color: '#CC0000', bg: '#FFE5E5' },
+    high: { label: 'גבוה', color: '#FF3B30', bg: '#FFF0F0' },
+    medium: { label: 'בינוני', color: '#FF9500', bg: '#FFF8E1' },
+    low: { label: 'נמוך', color: '#34C759', bg: '#F0FFF4' },
+};
+
 export default function ProjectDetailsScreen() {
     const { projectId } = useLocalSearchParams();
     const router = useRouter();
@@ -221,6 +234,8 @@ export default function ProjectDetailsScreen() {
                     rows: [
                         makeRow('מיקום:', it.location || '', true),
                         makeRow('אחראי:', it.assignedTo || '', false),
+                        makeRow('סטטוס:', STATUS_CONFIG[it.status || 'open']?.label || 'פתוח', true),
+                        makeRow('עדיפות:', PRIORITY_CONFIG[it.priority || 'medium']?.label || 'בינוני', false),
                         makeRow('הערות:', it.notes || '', true),
                     ],
                 }));
@@ -388,6 +403,30 @@ export default function ProjectDetailsScreen() {
                         <View>
                             <Text style={styles.reportName}>דוח מס {item.reportNumber}</Text>
                             <Text style={styles.reportInfo}>{item.subject} | {item.date}</Text>
+                            {(() => {
+                                const items = item.items || [];
+                                const total = items.length;
+                                if (total === 0) return <Text style={{ fontSize: 12, color: '#8E8E93', textAlign: 'right', marginTop: 3 }}>אין ליקויים</Text>;
+                                const open = items.filter((it: any) => !it.status || it.status === 'open').length;
+                                const inProg = items.filter((it: any) => it.status === 'in_progress').length;
+                                const fixed = items.filter((it: any) => it.status === 'fixed').length;
+                                return (
+                                    <View style={{ flexDirection: 'row-reverse', gap: 8, marginTop: 5, flexWrap: 'wrap' }}>
+                                        <View style={{ backgroundColor: '#FFE5E5', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
+                                            <Text style={{ color: '#FF3B30', fontSize: 11, fontWeight: '600' }}>פתוח: {open}</Text>
+                                        </View>
+                                        {inProg > 0 && <View style={{ backgroundColor: '#FFF3E0', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
+                                            <Text style={{ color: '#FF9500', fontSize: 11, fontWeight: '600' }}>בטיפול: {inProg}</Text>
+                                        </View>}
+                                        <View style={{ backgroundColor: '#E8F9EE', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
+                                            <Text style={{ color: '#34C759', fontSize: 11, fontWeight: '600' }}>טופל: {fixed}</Text>
+                                        </View>
+                                        <View style={{ backgroundColor: '#F2F2F7', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}>
+                                            <Text style={{ color: '#555', fontSize: 11, fontWeight: '600' }}>סה״כ: {total}</Text>
+                                        </View>
+                                    </View>
+                                );
+                            })()}
                         </View>
                         <View style={styles.reportActions}>
                             <TouchableOpacity onPress={() => exportReportToWord(item)} style={styles.actionBtn}>

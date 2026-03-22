@@ -7,6 +7,19 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 
+const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+    open: { label: 'פתוח', color: '#FF3B30', bg: '#FFE5E5' },
+    in_progress: { label: 'בטיפול', color: '#FF9500', bg: '#FFF3E0' },
+    fixed: { label: 'טופל', color: '#34C759', bg: '#E8F9EE' },
+};
+
+const PRIORITY_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
+    critical: { label: 'קריטי', color: '#CC0000', bg: '#FFE5E5' },
+    high: { label: 'גבוה', color: '#FF3B30', bg: '#FFF0F0' },
+    medium: { label: 'בינוני', color: '#FF9500', bg: '#FFF8E1' },
+    low: { label: 'נמוך', color: '#34C759', bg: '#F0FFF4' },
+};
+
 export default function ReviewScreen() {
     const router = useRouter();
     const { projectId, reportId } = useLocalSearchParams();
@@ -15,6 +28,7 @@ export default function ReviewScreen() {
     const [report, setReport] = useState<any>(null);
     const [sections, setSections] = useState<any[]>([]);
     const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+    const [statusFilter, setStatusFilter] = useState<string>('all');
 
     const toggleExpand = (itemId: string) => {
         setExpandedItems(prev => {
@@ -101,7 +115,7 @@ export default function ReviewScreen() {
         setSections(list);
     };
 
-    const persistItemField = async (itemId: string, fields: Partial<{ notes: string; assignedTo: string; images: string[]; location: string }>) => {
+    const persistItemField = async (itemId: string, fields: Partial<{ notes: string; assignedTo: string; images: string[]; location: string; status: string; priority: string }>) => {
         try {
             const data = await AsyncStorage.getItem('projects');
             if (!data) return;
@@ -209,6 +223,15 @@ export default function ReviewScreen() {
 
     const itemCount = report?.items?.length || 0;
 
+    const filteredSections = React.useMemo(() => {
+        if (statusFilter === 'all') return sections;
+        return sections.filter(s => {
+            if (s.type === 'comment') return true;
+            if (s.type === 'commentWindow') return (s.item?.status || 'open') === statusFilter;
+            return true;
+        });
+    }, [sections, statusFilter]);
+
     return (
         <View style={styles.container}>
             <View style={styles.topBar}>
@@ -226,8 +249,30 @@ export default function ReviewScreen() {
                 </View>
             </View>
 
+            <View style={{ flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: '#FFF', borderBottomWidth: 1, borderBottomColor: '#EEE', gap: 8, justifyContent: 'flex-end' }}>
+                {[
+                    { key: 'all', label: 'הכל' },
+                    { key: 'open', label: STATUS_CONFIG.open.label },
+                    { key: 'in_progress', label: STATUS_CONFIG.in_progress.label },
+                    { key: 'fixed', label: STATUS_CONFIG.fixed.label },
+                ].map(f => (
+                    <TouchableOpacity
+                        key={f.key}
+                        onPress={() => setStatusFilter(f.key)}
+                        style={{
+                            backgroundColor: statusFilter === f.key ? '#007AFF' : '#F2F2F7',
+                            borderRadius: 14,
+                            paddingHorizontal: 12,
+                            paddingVertical: 6,
+                        }}
+                    >
+                        <Text style={{ color: statusFilter === f.key ? '#FFF' : '#555', fontWeight: '600', fontSize: 13 }}>{f.label}</Text>
+                    </TouchableOpacity>
+                ))}
+            </View>
+
             <FlatList
-                data={sections}
+                data={filteredSections}
                 keyExtractor={(item) => item.id}
                 removeClippedSubviews={false}
                 initialNumToRender={15}
@@ -287,7 +332,17 @@ export default function ReviewScreen() {
                                         </TouchableOpacity>
                                     </View>
                                     <View style={styles.collapsedCenter}>
-                                        <Text style={styles.commentSerial}>ליקוי מס׳: {serial ?? liveItem.id}</Text>
+                                        <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                                            <Text style={styles.commentSerial}>ליקוי מס׳: {serial ?? liveItem.id}</Text>
+                                            {(() => {
+                                                const s = STATUS_CONFIG[liveItem.status || 'open'];
+                                                return <View style={{ backgroundColor: s.bg, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 }}><Text style={{ color: s.color, fontSize: 11, fontWeight: '600' }}>{s.label}</Text></View>;
+                                            })()}
+                                            {liveItem.priority && liveItem.priority !== 'medium' && (() => {
+                                                const p = PRIORITY_CONFIG[liveItem.priority];
+                                                return <View style={{ backgroundColor: p.bg, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 }}><Text style={{ color: p.color, fontSize: 11, fontWeight: '600' }}>{p.label}</Text></View>;
+                                            })()}
+                                        </View>
                                         {(liveItem.location || liveItem.notes) ? (
                                             <Text style={styles.collapsedSummary} numberOfLines={1} ellipsizeMode="tail">
                                                 {[liveItem.location, liveItem.notes].filter(Boolean).join(' · ')}
@@ -368,11 +423,51 @@ export default function ReviewScreen() {
                                             />
                                         </View>
 
+                                        <View style={styles.commentRow}>
+                                            <Text style={styles.commentFieldLabel}>סטטוס:</Text>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
+                                                {Object.entries(STATUS_CONFIG).map(([key, cfg]) => {
+                                                    const current = liveItem.status || 'open';
+                                                    return (
+                                                        <TouchableOpacity
+                                                            key={key}
+                                                            onPress={() => {
+                                                                setReport((prev: any) => ({ ...prev, items: (prev.items || []).map((x: any) => x.id === liveItem.id ? { ...x, status: key } : x) }));
+                                                                persistItemField(liveItem.id, { status: key });
+                                                            }}
+                                                            style={{
+                                                                backgroundColor: current === key ? cfg.bg : '#F2F2F7',
+                                                                borderRadius: 14,
+                                                                paddingHorizontal: 12,
+                                                                paddingVertical: 6,
+                                                                borderWidth: 2,
+                                                                borderColor: current === key ? cfg.color : 'transparent',
+                                                            }}
+                                                        >
+                                                            <Text style={{ color: current === key ? cfg.color : '#8E8E93', fontWeight: '600', fontSize: 13 }}>{cfg.label}</Text>
+                                                        </TouchableOpacity>
+                                                    );
+                                                })}
+                                            </View>
+                                        </View>
+
                                         <View style={styles.commentRowImage}>
                                             {liveItem.images && liveItem.images.length > 0 ? (
                                                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                                                     {liveItem.images.map((uri: string, i: number) => (
-                                                        <Image key={i} source={{ uri }} style={styles.commentImageLarge} />
+                                                        <View key={i} style={{ position: 'relative', marginLeft: 8 }}>
+                                                            <Image source={{ uri }} style={styles.commentImageLarge} />
+                                                            <TouchableOpacity
+                                                                onPress={() => {
+                                                                    const newImages = liveItem.images.filter((_: string, idx: number) => idx !== i);
+                                                                    setReport((prev: any) => ({ ...prev, items: (prev.items || []).map((x: any) => x.id === liveItem.id ? { ...x, images: newImages } : x) }));
+                                                                    persistItemField(liveItem.id, { images: newImages });
+                                                                }}
+                                                                style={{ position: 'absolute', top: 4, right: 4, backgroundColor: 'rgba(0,0,0,0.6)', borderRadius: 12, width: 24, height: 24, justifyContent: 'center', alignItems: 'center' }}
+                                                            >
+                                                                <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold', lineHeight: 20 }}>✕</Text>
+                                                            </TouchableOpacity>
+                                                        </View>
                                                     ))}
                                                 </ScrollView>
                                             ) : (
