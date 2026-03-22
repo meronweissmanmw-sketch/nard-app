@@ -14,6 +14,19 @@ export default function ReviewScreen() {
     const [project, setProject] = useState<any>(null);
     const [report, setReport] = useState<any>(null);
     const [sections, setSections] = useState<any[]>([]);
+    const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+
+    const toggleExpand = (itemId: string) => {
+        setExpandedItems(prev => {
+            const next = new Set(prev);
+            if (next.has(itemId)) {
+                next.delete(itemId);
+            } else {
+                next.add(itemId);
+            }
+            return next;
+        });
+    };
 
     useFocusEffect(
         React.useCallback(() => {
@@ -244,27 +257,14 @@ export default function ReviewScreen() {
                         const serial = item.serial;
                         const totalItems = report?.items?.length || 0;
                         const currentIndex = (serial ?? 1) - 1;
+                        const isExpanded = expandedItems.has(liveItem.id);
+                        const firstImage = liveItem.images && liveItem.images.length > 0 ? liveItem.images[0] : null;
+
                         return (
                             <View style={styles.commentWindow}>
-                                <View style={styles.commentWindowHeader}>
-                                    <View style={styles.reorderButtons}>
-                                        <TouchableOpacity
-                                            onPress={() => reorderItem(liveItem.id, 'up')}
-                                            disabled={currentIndex <= 0}
-                                            style={[styles.reorderBtn, currentIndex <= 0 && styles.reorderBtnDisabled]}
-                                        >
-                                            <Ionicons name="chevron-up" size={18} color={currentIndex <= 0 ? '#CCC' : '#555'} />
-                                        </TouchableOpacity>
-                                        <TouchableOpacity
-                                            onPress={() => reorderItem(liveItem.id, 'down')}
-                                            disabled={currentIndex >= totalItems - 1}
-                                            style={[styles.reorderBtn, currentIndex >= totalItems - 1 && styles.reorderBtnDisabled]}
-                                        >
-                                            <Ionicons name="chevron-down" size={18} color={currentIndex >= totalItems - 1 ? '#CCC' : '#555'} />
-                                        </TouchableOpacity>
-                                    </View>
-                                    <Text style={styles.commentSerial}>ליקוי מס׳: {serial ?? liveItem.id}</Text>
-                                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center' }}>
+                                {/* Collapsed row: serial, small photo, edit & delete buttons */}
+                                <View style={styles.collapsedRow}>
+                                    <View style={styles.collapsedLeft}>
                                         <TouchableOpacity
                                             onPress={() =>
                                                 Alert.alert(
@@ -276,67 +276,113 @@ export default function ReviewScreen() {
                                                     ]
                                                 )
                                             }
-                                            style={{ marginLeft: 8 }}
+                                            style={styles.deleteBtn}
                                         >
-                                            <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+                                            <Ionicons name="trash-outline" size={18} color="#FF3B30" />
+                                            <Text style={styles.deleteBtnText}>מחק</Text>
                                         </TouchableOpacity>
-                                        <TouchableOpacity onPress={() => openCameraForItem(liveItem)} style={styles.cameraBtnSmall}>
-                                            <Ionicons name="camera" size={18} color="white" />
-                                            <Text style={styles.cameraBtnTextSmall}>הוסף צילום</Text>
+                                        <TouchableOpacity onPress={() => toggleExpand(liveItem.id)} style={styles.editBtn}>
+                                            <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color="#FFF" />
+                                            <Text style={styles.editBtnText}>{isExpanded ? 'סגור' : 'עריכה'}</Text>
                                         </TouchableOpacity>
+                                    </View>
+                                    <View style={styles.collapsedCenter}>
+                                        <Text style={styles.commentSerial}>ליקוי מס׳: {serial ?? liveItem.id}</Text>
+                                        {(liveItem.location || liveItem.notes) ? (
+                                            <Text style={styles.collapsedSummary} numberOfLines={1} ellipsizeMode="tail">
+                                                {[liveItem.location, liveItem.notes].filter(Boolean).join(' · ')}
+                                            </Text>
+                                        ) : null}
+                                    </View>
+                                    <View style={styles.collapsedRight}>
+                                        {firstImage ? (
+                                            <Image source={{ uri: firstImage }} style={styles.collapsedThumb} />
+                                        ) : (
+                                            <View style={styles.collapsedThumbPlaceholder}>
+                                                <Ionicons name="image-outline" size={22} color="#CCC" />
+                                            </View>
+                                        )}
                                     </View>
                                 </View>
 
-                                <View style={styles.commentRow}>
-                                    <Text style={styles.commentFieldLabel}>מיקום:</Text>
-                                    <TextInput
-                                        style={[styles.commentFieldInput, { minHeight: 36 }]}
-                                        value={liveItem.location}
-                                        onChangeText={(txt) => setReport((prev: any) => ({ ...prev, items: (prev.items || []).map((x: any) => x.id === liveItem.id ? { ...x, location: txt } : x) }))}
-                                        onEndEditing={(e) => persistItemField(liveItem.id, { location: e.nativeEvent.text })}
-                                        placeholder="מיקום"
-                                        textAlign="right"
-                                    />
-                                </View>
-
-                                <View style={styles.commentRow}>
-                                    <Text style={styles.commentFieldLabel}>הערות:</Text>
-                                    <TextInput
-                                        style={styles.commentFieldInput}
-                                        multiline
-                                        value={liveItem.notes}
-                                        onChangeText={(txt) => setReport((prev: any) => ({ ...prev, items: (prev.items || []).map((x: any) => x.id === liveItem.id ? { ...x, notes: txt } : x) }))}
-                                        onEndEditing={(e) => persistItemField(liveItem.id, { notes: e.nativeEvent.text })}
-                                        placeholder="הערות"
-                                        textAlign="right"
-                                    />
-                                </View>
-
-                                <View style={styles.commentRow}>
-                                    <Text style={styles.commentFieldLabel}>אחראי לתיקון:</Text>
-                                    <TextInput
-                                        style={[styles.commentFieldInput, { height: 36 }]}
-                                        value={liveItem.assignedTo}
-                                        onChangeText={(txt) => setReport((prev: any) => ({ ...prev, items: (prev.items || []).map((x: any) => x.id === liveItem.id ? { ...x, assignedTo: txt } : x) }))}
-                                        onEndEditing={(e) => persistItemField(liveItem.id, { assignedTo: e.nativeEvent.text })}
-                                        placeholder="אחראי"
-                                        textAlign="right"
-                                    />
-                                </View>
-
-                                <View style={styles.commentRowImage}>
-                                    {liveItem.images && liveItem.images.length > 0 ? (
-                                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                            {liveItem.images.map((uri: string, i: number) => (
-                                                <Image key={i} source={{ uri }} style={styles.commentImageSmall} />
-                                            ))}
-                                        </ScrollView>
-                                    ) : (
-                                        <View style={styles.commentImagePlaceholder}>
-                                            <Text style={{ color: '#999' }}>אין תמונה</Text>
+                                {/* Expanded details */}
+                                {isExpanded && (
+                                    <View style={styles.expandedContent}>
+                                        <View style={styles.reorderRow}>
+                                            <View style={styles.reorderButtons}>
+                                                <TouchableOpacity
+                                                    onPress={() => reorderItem(liveItem.id, 'up')}
+                                                    disabled={currentIndex <= 0}
+                                                    style={[styles.reorderBtn, currentIndex <= 0 && styles.reorderBtnDisabled]}
+                                                >
+                                                    <Ionicons name="chevron-up" size={18} color={currentIndex <= 0 ? '#CCC' : '#555'} />
+                                                </TouchableOpacity>
+                                                <TouchableOpacity
+                                                    onPress={() => reorderItem(liveItem.id, 'down')}
+                                                    disabled={currentIndex >= totalItems - 1}
+                                                    style={[styles.reorderBtn, currentIndex >= totalItems - 1 && styles.reorderBtnDisabled]}
+                                                >
+                                                    <Ionicons name="chevron-down" size={18} color={currentIndex >= totalItems - 1 ? '#CCC' : '#555'} />
+                                                </TouchableOpacity>
+                                            </View>
+                                            <TouchableOpacity onPress={() => openCameraForItem(liveItem)} style={styles.cameraBtnSmall}>
+                                                <Ionicons name="camera" size={18} color="white" />
+                                                <Text style={styles.cameraBtnTextSmall}>הוסף צילום</Text>
+                                            </TouchableOpacity>
                                         </View>
-                                    )}
-                                </View>
+
+                                        <View style={styles.commentRow}>
+                                            <Text style={styles.commentFieldLabel}>מיקום:</Text>
+                                            <TextInput
+                                                style={[styles.commentFieldInput, { minHeight: 36 }]}
+                                                value={liveItem.location}
+                                                onChangeText={(txt) => setReport((prev: any) => ({ ...prev, items: (prev.items || []).map((x: any) => x.id === liveItem.id ? { ...x, location: txt } : x) }))}
+                                                onEndEditing={(e) => persistItemField(liveItem.id, { location: e.nativeEvent.text })}
+                                                placeholder="מיקום"
+                                                textAlign="right"
+                                            />
+                                        </View>
+
+                                        <View style={styles.commentRow}>
+                                            <Text style={styles.commentFieldLabel}>הערות:</Text>
+                                            <TextInput
+                                                style={styles.commentFieldInput}
+                                                multiline
+                                                value={liveItem.notes}
+                                                onChangeText={(txt) => setReport((prev: any) => ({ ...prev, items: (prev.items || []).map((x: any) => x.id === liveItem.id ? { ...x, notes: txt } : x) }))}
+                                                onEndEditing={(e) => persistItemField(liveItem.id, { notes: e.nativeEvent.text })}
+                                                placeholder="הערות"
+                                                textAlign="right"
+                                            />
+                                        </View>
+
+                                        <View style={styles.commentRow}>
+                                            <Text style={styles.commentFieldLabel}>אחראי לתיקון:</Text>
+                                            <TextInput
+                                                style={[styles.commentFieldInput, { height: 36 }]}
+                                                value={liveItem.assignedTo}
+                                                onChangeText={(txt) => setReport((prev: any) => ({ ...prev, items: (prev.items || []).map((x: any) => x.id === liveItem.id ? { ...x, assignedTo: txt } : x) }))}
+                                                onEndEditing={(e) => persistItemField(liveItem.id, { assignedTo: e.nativeEvent.text })}
+                                                placeholder="אחראי"
+                                                textAlign="right"
+                                            />
+                                        </View>
+
+                                        <View style={styles.commentRowImage}>
+                                            {liveItem.images && liveItem.images.length > 0 ? (
+                                                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                                                    {liveItem.images.map((uri: string, i: number) => (
+                                                        <Image key={i} source={{ uri }} style={styles.commentImageLarge} />
+                                                    ))}
+                                                </ScrollView>
+                                            ) : (
+                                                <View style={styles.commentImagePlaceholder}>
+                                                    <Text style={{ color: '#999' }}>אין תמונה</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                    </View>
+                                )}
                             </View>
                         );
                     }
@@ -370,7 +416,20 @@ const styles = StyleSheet.create({
     commentInput: { minHeight: 60, textAlignVertical: 'top', backgroundColor: '#F9F9F9', padding: 8, borderRadius: 6 },
     commentWindow: { backgroundColor: '#FFF', padding: 12, marginHorizontal: 12, marginTop: 10, borderRadius: 8, borderWidth: 1, borderColor: '#EEE' },
     commentWindowHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-    commentSerial: { fontWeight: '700', fontSize: 16 },
+    commentSerial: { fontWeight: '700', fontSize: 15 },
+    collapsedRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
+    collapsedRight: { marginLeft: 8 },
+    collapsedCenter: { flex: 1, alignItems: 'flex-end', paddingHorizontal: 8 },
+    collapsedLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    collapsedSummary: { fontSize: 12, color: '#8E8E93', marginTop: 2, textAlign: 'right' },
+    collapsedThumb: { width: 56, height: 56, borderRadius: 6 },
+    collapsedThumbPlaceholder: { width: 56, height: 56, borderRadius: 6, backgroundColor: '#F2F2F7', justifyContent: 'center', alignItems: 'center' },
+    editBtn: { backgroundColor: '#007AFF', flexDirection: 'row', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, alignItems: 'center', gap: 4 },
+    editBtnText: { color: '#FFF', fontWeight: '600', fontSize: 13 },
+    deleteBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 6, borderRadius: 6, borderWidth: 1, borderColor: '#FF3B30' },
+    deleteBtnText: { color: '#FF3B30', fontWeight: '600', fontSize: 13 },
+    expandedContent: { marginTop: 12, borderTopWidth: 1, borderTopColor: '#EEE', paddingTop: 10 },
+    reorderRow: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
     reorderButtons: { flexDirection: 'column', alignItems: 'center', marginLeft: 4 },
     reorderBtn: { padding: 2 },
     reorderBtnDisabled: { opacity: 0.3 },
@@ -381,5 +440,6 @@ const styles = StyleSheet.create({
     commentFieldInput: { backgroundColor: '#F9F9F9', padding: 8, borderRadius: 6, minHeight: 40 },
     commentRowImage: { marginTop: 10, alignItems: 'flex-end' },
     commentImageSmall: { width: 90, height: 68, borderRadius: 6, marginLeft: 8 },
+    commentImageLarge: { width: 200, height: 150, borderRadius: 8, marginLeft: 8 },
     commentImagePlaceholder: { width: 120, height: 90, borderRadius: 6, backgroundColor: '#F2F2F7', justifyContent: 'center', alignItems: 'center' }
 });
