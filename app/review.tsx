@@ -1,11 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, FlatList,
-    TextInput, ScrollView, Platform, Image, Alert
+    TextInput, ScrollView, Platform, Image, Alert, Modal
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
+
+const HEADER_HEIGHT = 40;
+const FLOOR_HEIGHT = 36;
+const PARKING_SUB_HEIGHT = 28;
+const MODAL_SAVE_CONFIRMATION_DURATION = 1200;
 
 export default function ReviewScreen() {
     const router = useRouter();
@@ -15,18 +20,66 @@ export default function ReviewScreen() {
     const [report, setReport] = useState<any>(null);
     const [sections, setSections] = useState<any[]>([]);
 
+    const [defectModalVisible, setDefectModalVisible] = useState(false);
+    const [modalItem, setModalItem] = useState<any>(null);
+    const [modalNotes, setModalNotes] = useState('');
+    const [modalAssignedTo, setModalAssignedTo] = useState('');
+    const [modalSaved, setModalSaved] = useState(false);
+    const [modalSerial, setModalSerial] = useState<number | null>(null);
+    const [pendingModalItemId, setPendingModalItemId] = useState<string | null>(null);
+
     useFocusEffect(
         React.useCallback(() => {
             loadData();
         }, [projectId, reportId])
     );
 
+    useEffect(() => {
+        if (pendingModalItemId && report) {
+            const item = (report.items || []).find((it: any) => it.id === pendingModalItemId);
+            if (item) {
+                openDefectModal(item);
+                setPendingModalItemId(null);
+            }
+        }
+    }, [pendingModalItemId, report]);
+
+    const openDefectModal = (item: any) => {
+        setModalItem(item);
+        setModalNotes(item.notes || '');
+        setModalAssignedTo(item.assignedTo || '');
+        setModalSaved(false);
+        const serial = report?.items
+            ? report.items.findIndex((x: any) => x.id === item.id) + 1
+            : null;
+        setModalSerial(serial);
+        setDefectModalVisible(true);
+    };
+
+    const saveDefectModal = async () => {
+        if (!modalItem) return;
+        await persistItemField(modalItem.id, { notes: modalNotes, assignedTo: modalAssignedTo });
+        setModalItem((prev: any) => ({ ...prev, notes: modalNotes, assignedTo: modalAssignedTo }));
+        setModalSaved(true);
+        setTimeout(() => {
+            setDefectModalVisible(false);
+            setModalSaved(false);
+        }, MODAL_SAVE_CONFIRMATION_DURATION);
+    };
+
+    const openCameraForExistingItem = (it: any) => {
+        if (!projectId || !reportId) {
+            Alert.alert('שגיאה', 'פרויקט או דוח לא מוגדרים');
+            return;
+        }
+        const url = `/camera?projectId=${encodeURIComponent(String(projectId))}&reportId=${encodeURIComponent(String(reportId))}&itemId=${encodeURIComponent(String(it.id))}&locationName=${encodeURIComponent(it.location || '')}`;
+        router.push(url as any);
+    };
+
     const loadData = async () => {
         try {
-            const [data, openingNote, closingNote, defaultSubject] = await Promise.all([
+            const [data, defaultSubject] = await Promise.all([
                 AsyncStorage.getItem('projects'),
-                AsyncStorage.getItem('openingNote'),
-                AsyncStorage.getItem('closingNote'),
                 AsyncStorage.getItem('defaultSubject')
             ]);
 
@@ -38,17 +91,23 @@ export default function ReviewScreen() {
                 if (foundReport && !foundReport.subject) {
                     foundReport.subject = defaultSubject ?? 'דוח פיקוח הנדסי';
                 }
-                if (foundReport && foundReport.initialNotes == null) {
-                    foundReport.initialNotes = openingNote ?? '';
-                }
-                if (foundReport && foundReport.finalNotes == null) {
-                    foundReport.finalNotes = closingNote ?? '';
-                }
 
                 setProject(foundProject);
                 setReport(foundReport);
-                if (foundReport) {
-                    buildReviewList(foundReport);
+                if (foundProject) {
+                    buildLocationTree(foundProject.structure);
+                    try {
+                        const targetRaw = await AsyncStorage.getItem('cameraReturnTarget');
+                        if (targetRaw) {
+                            const target = JSON.parse(targetRaw);
+                            if (target && target.reportId === reportId && target.itemId) {
+                                setPendingModalItemId(target.itemId);
+                            }
+                            await AsyncStorage.removeItem('cameraReturnTarget');
+                        }
+                    } catch (e) {
+                        console.warn('Error reading cameraReturnTarget', e);
+                    }
                 }
             }
         } catch (e) {
@@ -56,36 +115,63 @@ export default function ReviewScreen() {
         }
     };
 
-    const buildReviewList = (reportData: any) => {
-        const list: any[] = [];
+    const buildLocationTree = (structure: any) => {
+        const tree: any[] = [];
 
-        list.push({
-            type: 'comment',
-            position: 'start',
-            label: reportData.initialNotes ?? '',
-            noteKey: 'initialNotes',
-            id: `report-start-${reportData.id}`
+        (structure?.buildings || []).forEach((b: any, bIdx: number) => {
+            const bKey = b.id ?? `b${bIdx}`;
+            tree.push({ type: 'header', label: b.name || `בניין ${bIdx + 1}`, id: `header-${bKey}`, meta: { floors: b.floors || 0 } });
+            for (let i = 1; i <= (b.floors || 0); i++) {
+                const fullLoc = `${b.name || `בניין ${bIdx + 1}`} - קומה ${i}`;
+                tree.push({ type: 'floor', label: `קומה ${i}`, fullLocation: fullLoc, id: `floor-${bKey}-${i}` });
+            }
         });
 
-        (reportData.items || []).forEach((it: any, idx: number) => {
-            list.push({
-                type: 'commentWindow',
-                label: it.notes || 'ליקוי',
-                id: `item-${it.id}`,
-                item: it,
-                serial: idx + 1
+        if (Array.isArray(structure?.parkings) && structure.parkings.length > 0) {
+            structure.parkings.forEach((p: any, pIdx: number) => {
+                const pKey = p.id ?? `p${pIdx}`;
+                tree.push({ type: 'header', label: p.name || `חניון ${pIdx + 1}`, id: `parking-header-${pKey}`, meta: { floors: p.floors || 0 } });
+                if (Array.isArray(p.areas) && p.areas.length > 0) {
+                    for (let i = 1; i <= (p.floors || 0); i++) {
+                        tree.push({ type: 'parkingFloor', label: `קומה ${i}`, fullLocation: `${p.name || `חניון ${pIdx + 1}`} - קומה ${i}`, id: `parking-${pKey}-floor-${i}-header` });
+                        p.areas.forEach((a: any, aIdx: number) => {
+                            const aKey = a.id ?? `a${aIdx}`;
+                            const fullLoc = `${p.name || `חניון ${pIdx + 1}`} - קומה ${i} - ${a.name || `אזור ${aIdx + 1}`}`;
+                            tree.push({ type: 'floor', label: a.name || `אזור ${aIdx + 1}`, fullLocation: fullLoc, id: `parking-${pKey}-floor-${i}-area-${aKey}` });
+                        });
+                    }
+                } else {
+                    for (let i = 1; i <= (p.floors || 0); i++) {
+                        tree.push({ type: 'parkingFloor', label: `קומה ${i}`, fullLocation: `${p.name || `חניון ${pIdx + 1}`} - קומה ${i}`, id: `parking-floor-${pKey}-${i}` });
+                    }
+                }
             });
-        });
+        } else if (typeof structure?.parkingFloors === 'number' && structure.parkingFloors > 0) {
+            tree.push({ type: 'header', label: 'חניון', id: `parking-header` });
+            for (let i = 1; i <= structure.parkingFloors; i++) {
+                tree.push({ type: 'parkingFloor', label: `קומה ${i}`, fullLocation: `חניון - קומה ${i}`, id: `parking-floor-${i}` });
+            }
+        }
 
-        list.push({
-            type: 'comment',
-            position: 'end',
-            label: reportData.finalNotes ?? '',
-            noteKey: 'finalNotes',
-            id: `report-end-${reportData.id}`
-        });
+        if (Array.isArray(structure?.development?.areas) && structure.development.areas.length > 0) {
+            tree.push({ type: 'header', label: 'פיתוח חוץ', id: `dev-header`, meta: { floors: 1 } });
+            tree.push({ type: 'parkingFloor', label: 'קומה 1', fullLocation: 'פיתוח חוץ - קומה 1', id: `dev-floor-1` });
+            structure.development.areas.forEach((a: any, aIdx: number) => {
+                const aKey = a.id ?? `a${aIdx}`;
+                const fullLoc = `פיתוח חוץ - קומה 1 - ${a.name || `אזור ${aIdx + 1}`}`;
+                tree.push({ type: 'floor', label: a.name || `אזור ${aIdx + 1}`, fullLocation: fullLoc, id: `dev-area-${aKey}` });
+            });
+        } else if (structure?.hasDevelopment && Array.isArray(structure?.areas) && structure.areas.length > 0) {
+            tree.push({ type: 'header', label: 'פיתוח חוץ', id: `dev-header`, meta: { floors: 1 } });
+            tree.push({ type: 'parkingFloor', label: 'קומה 1', fullLocation: 'פיתוח חוץ - קומה 1', id: `dev-floor-1` });
+            structure.areas.forEach((a: any, aIdx: number) => {
+                const aKey = a.id ?? `a${aIdx}`;
+                const fullLoc = `פיתוח חוץ - קומה 1 - ${a.name || `אזור ${aIdx + 1}`}`;
+                tree.push({ type: 'floor', label: a.name || `אזור ${aIdx + 1}`, fullLocation: fullLoc, id: `dev-area-${aKey}` });
+            });
+        }
 
-        setSections(list);
+        setSections(tree);
     };
 
     const persistItemField = async (itemId: string, fields: Partial<{ notes: string; assignedTo: string; images: string[]; location: string }>) => {
@@ -111,59 +197,30 @@ export default function ReviewScreen() {
         }
     };
 
-    const persistReportField = async (field: 'initialNotes' | 'finalNotes' | 'subject', value: string) => {
-        try {
-            setReport((prev: any) => ({ ...prev, [field]: value }));
-            const data = await AsyncStorage.getItem('projects');
-            if (!data) return;
-            const projects = JSON.parse(data);
-            const updated = projects.map((p: any) => {
-                if (p.id !== projectId) return p;
-                return {
-                    ...p,
-                    reports: (p.reports || []).map((r: any) => r.id === reportId ? { ...r, [field]: value } : r)
-                };
-            });
-            await AsyncStorage.setItem('projects', JSON.stringify(updated));
-        } catch (e) {
-            console.error('Failed to persist report field', e);
-        }
-    };
-
-    const deleteCommentWindow = async (itemId: string) => {
-        try {
-            const data = await AsyncStorage.getItem('projects');
-            if (!data) return;
-            const projects = JSON.parse(data);
-            const updated = projects.map((p: any) => {
-                if (p.id !== projectId) return p;
-                return {
-                    ...p,
-                    reports: (p.reports || []).map((r: any) => {
-                        if (r.id !== reportId) return r;
-                        return { ...r, items: (r.items || []).filter((it: any) => it.id !== itemId) };
-                    })
-                };
-            });
-            await AsyncStorage.setItem('projects', JSON.stringify(updated));
-            const newReport = { ...report, items: (report?.items || []).filter((it: any) => it.id !== itemId) };
-            setReport(newReport);
-            buildReviewList(newReport);
-        } catch (e) {
-            console.error('Failed to delete comment window', e);
-        }
-    };
-
-    const openCameraForItem = (it: any) => {
+    const openCameraForLocation = (locationName: string) => {
         if (!projectId || !reportId) {
             Alert.alert('שגיאה', 'פרויקט או דוח לא מוגדרים');
             return;
         }
-        const url = `/camera?projectId=${encodeURIComponent(String(projectId))}&reportId=${encodeURIComponent(String(reportId))}&itemId=${encodeURIComponent(String(it.id))}&locationName=${encodeURIComponent(it.location || '')}`;
+        const url = `/camera?projectId=${encodeURIComponent(String(projectId))}&reportId=${encodeURIComponent(String(reportId))}&locationName=${encodeURIComponent(locationName)}`;
         router.push(url as any);
     };
 
     const itemCount = report?.items?.length || 0;
+
+    const getItemLayout = (data: any, index: number) => {
+        if (!data || index >= data.length) {
+            return { length: FLOOR_HEIGHT, offset: FLOOR_HEIGHT * index, index };
+        }
+        let offset = 0;
+        for (let i = 0; i < index; i++) {
+            const t = data[i]?.type;
+            offset += t === 'header' ? HEADER_HEIGHT : (t === 'parkingFloor' ? PARKING_SUB_HEIGHT : FLOOR_HEIGHT);
+        }
+        const tIndex = data[index]?.type;
+        const length = tIndex === 'header' ? HEADER_HEIGHT : (tIndex === 'parkingFloor' ? PARKING_SUB_HEIGHT : FLOOR_HEIGHT);
+        return { length, offset, index };
+    };
 
     return (
         <View style={styles.container}>
@@ -185,104 +242,146 @@ export default function ReviewScreen() {
             <FlatList
                 data={sections}
                 keyExtractor={(item) => item.id}
+                getItemLayout={getItemLayout}
                 removeClippedSubviews={false}
-                initialNumToRender={15}
-                contentContainerStyle={{ paddingBottom: 20 }}
+                initialNumToRender={20}
+                stickyHeaderIndices={sections
+                    .map((obj, index) => obj?.type === 'header' ? index : -1)
+                    .filter(idx => idx !== -1)
+                }
                 renderItem={({ item }) => {
-                    if (item.type === 'comment') {
-                        const noteKey = item.noteKey as 'initialNotes' | 'finalNotes';
+                    if (item.type === 'header') {
+                        const floors = item.meta?.floors;
                         return (
-                            <View style={styles.commentSection}>
-                                <Text style={styles.commentLabel}>{item.position === 'start' ? 'פתיחת דוח (הערת פתיחה)' : 'סיום דוח (הערת סיום)'}</Text>
-                                <TextInput
-                                    style={styles.commentInput}
-                                    multiline
-                                    value={report ? (report[noteKey] ?? '') : (item.label ?? '')}
-                                    onChangeText={(txt) => setReport((prev: any) => ({ ...prev, [noteKey]: txt }))}
-                                    onEndEditing={(e) => persistReportField(noteKey, e.nativeEvent.text)}
-                                    placeholder={item.position === 'start' ? 'הערת פתיחה לדוח' : 'הערת סיום לדוח'}
-                                    textAlign="right"
-                                />
+                            <View style={styles.headerSection}>
+                                <View style={styles.headerRowInner}>
+                                    <View style={{ alignItems: 'flex-end', flex: 1 }}>
+                                        <Text style={styles.headerText}>{item.label}</Text>
+                                        {typeof floors === 'number' && floors > 0 ? (
+                                            <Text style={styles.headerSubText}>{`קומות: ${floors}`}</Text>
+                                        ) : null}
+                                    </View>
+                                </View>
                             </View>
                         );
                     }
 
-                    if (item.type === 'commentWindow') {
-                        const it = item.item;
-                        const liveItem = (report?.items || []).find((x: any) => x.id === it.id) || it;
-                        const serial = item.serial;
+                    if (item.type === 'parkingFloor') {
                         return (
-                            <View style={styles.commentWindow}>
-                                <View style={styles.commentWindowHeader}>
-                                    <Text style={styles.commentSerial}>ליקוי מס׳: {serial ?? liveItem.id}</Text>
-                                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center' }}>
-                                        <TouchableOpacity onPress={() => deleteCommentWindow(liveItem.id)} style={{ marginLeft: 8 }}>
-                                            <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-                                        </TouchableOpacity>
-                                        <TouchableOpacity onPress={() => openCameraForItem(liveItem)} style={styles.cameraBtnSmall}>
-                                            <Ionicons name="camera" size={18} color="white" />
-                                            <Text style={styles.cameraBtnTextSmall}>הוסף צילום</Text>
-                                        </TouchableOpacity>
+                            <View style={styles.parkingFloorSection}>
+                                <View style={styles.floorRowInner}>
+                                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                                        <Text style={styles.parkingFloorText}>{item.label}</Text>
                                     </View>
                                 </View>
-
-                                <View style={styles.commentRow}>
-                                    <Text style={styles.commentFieldLabel}>מיקום:</Text>
-                                    <TextInput
-                                        style={[styles.commentFieldInput, { minHeight: 36 }]}
-                                        value={liveItem.location}
-                                        onChangeText={(txt) => setReport((prev: any) => ({ ...prev, items: (prev.items || []).map((x: any) => x.id === liveItem.id ? { ...x, location: txt } : x) }))}
-                                        onEndEditing={(e) => persistItemField(liveItem.id, { location: e.nativeEvent.text })}
-                                        placeholder="מיקום"
-                                        textAlign="right"
-                                    />
-                                </View>
-
-                                <View style={styles.commentRow}>
-                                    <Text style={styles.commentFieldLabel}>הערות:</Text>
-                                    <TextInput
-                                        style={styles.commentFieldInput}
-                                        multiline
-                                        value={liveItem.notes}
-                                        onChangeText={(txt) => setReport((prev: any) => ({ ...prev, items: (prev.items || []).map((x: any) => x.id === liveItem.id ? { ...x, notes: txt } : x) }))}
-                                        onEndEditing={(e) => persistItemField(liveItem.id, { notes: e.nativeEvent.text })}
-                                        placeholder="הערות"
-                                        textAlign="right"
-                                    />
-                                </View>
-
-                                <View style={styles.commentRow}>
-                                    <Text style={styles.commentFieldLabel}>אחראי לתיקון:</Text>
-                                    <TextInput
-                                        style={[styles.commentFieldInput, { height: 36 }]}
-                                        value={liveItem.assignedTo}
-                                        onChangeText={(txt) => setReport((prev: any) => ({ ...prev, items: (prev.items || []).map((x: any) => x.id === liveItem.id ? { ...x, assignedTo: txt } : x) }))}
-                                        onEndEditing={(e) => persistItemField(liveItem.id, { assignedTo: e.nativeEvent.text })}
-                                        placeholder="אחראי"
-                                        textAlign="right"
-                                    />
-                                </View>
-
-                                <View style={styles.commentRowImage}>
-                                    {liveItem.images && liveItem.images.length > 0 ? (
-                                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                            {liveItem.images.map((uri: string, i: number) => (
-                                                <Image key={i} source={{ uri }} style={styles.commentImageSmall} />
-                                            ))}
-                                        </ScrollView>
-                                    ) : (
-                                        <View style={styles.commentImagePlaceholder}>
-                                            <Text style={{ color: '#999' }}>אין תמונה</Text>
-                                        </View>
-                                    )}
-                                </View>
                             </View>
+                        );
+                    }
+
+                    if (item.type === 'floor') {
+                        const pathLabel = item.fullLocation || item.label;
+                        return (
+                            <TouchableOpacity
+                                activeOpacity={0.7}
+                                style={styles.floorSection}
+                                onPress={() => openCameraForLocation(pathLabel)}
+                            >
+                                <View style={styles.floorRowInner}>
+                                    <View style={styles.floorCameraBtn}>
+                                        <Ionicons name="camera" size={18} color="white" />
+                                    </View>
+                                    <View style={{ flex: 1, alignItems: 'flex-end' }}>
+                                        <Text style={styles.floorText}>{pathLabel}</Text>
+                                    </View>
+                                </View>
+                            </TouchableOpacity>
                         );
                     }
 
                     return null;
                 }}
             />
+
+            <Modal
+                visible={defectModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setDefectModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        <View style={styles.modalHeader}>
+                            <TouchableOpacity onPress={() => setDefectModalVisible(false)} style={styles.modalCloseBtn}>
+                                <Ionicons name="close" size={24} color="#666" />
+                            </TouchableOpacity>
+                            <Text style={styles.modalTitle}>
+                                {modalSerial != null ? `ליקוי מס׳ ${modalSerial}` : 'עריכת ליקוי'}
+                            </Text>
+                            <View style={{ width: 40 }} />
+                        </View>
+
+                        {modalItem && (
+                            <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
+                                <Text style={styles.modalFieldLabel}>מיקום:</Text>
+                                <Text style={styles.modalLocationText}>{modalItem.location}</Text>
+
+                                <Text style={styles.modalFieldLabel}>הערות:</Text>
+                                <TextInput
+                                    style={styles.modalTextArea}
+                                    multiline
+                                    value={modalNotes}
+                                    onChangeText={setModalNotes}
+                                    placeholder="הזן הערות על הליקוי"
+                                    textAlign="right"
+                                    textAlignVertical="top"
+                                />
+
+                                <Text style={styles.modalFieldLabel}>אחראי לתיקון:</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    value={modalAssignedTo}
+                                    onChangeText={setModalAssignedTo}
+                                    placeholder="שם האחראי לתיקון"
+                                    textAlign="right"
+                                />
+
+                                {modalItem.images && modalItem.images.length > 0 && (
+                                    <>
+                                        <Text style={styles.modalFieldLabel}>תמונות ({modalItem.images.length}):</Text>
+                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                                            {modalItem.images.map((uri: string, i: number) => (
+                                                <Image key={i} source={{ uri }} style={styles.modalImage} />
+                                            ))}
+                                        </ScrollView>
+                                    </>
+                                )}
+
+                                <TouchableOpacity
+                                    style={styles.modalCameraBtn}
+                                    onPress={() => {
+                                        setDefectModalVisible(false);
+                                        openCameraForExistingItem(modalItem);
+                                    }}
+                                >
+                                    <Ionicons name="camera" size={18} color="white" />
+                                    <Text style={styles.modalCameraBtnText}>הוסף / עדכן צילום</Text>
+                                </TouchableOpacity>
+                            </ScrollView>
+                        )}
+
+                        {modalSaved ? (
+                            <View style={styles.modalSavedMsg}>
+                                <Ionicons name="checkmark-circle" size={22} color="#34C759" />
+                                <Text style={styles.modalSavedText}>הליקוי נשמר בהצלחה ✓</Text>
+                            </View>
+                        ) : (
+                            <TouchableOpacity style={styles.modalSaveBtn} onPress={saveDefectModal}>
+                                <Text style={styles.modalSaveBtnText}>שמור ליקוי</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                </View>
+            </Modal>
         </View>
     );
 }
@@ -304,18 +403,119 @@ const styles = StyleSheet.create({
     subjectText: { fontSize: 16, fontWeight: '600', color: '#1C1C1E', textAlign: 'center' },
     badgeContainer: { backgroundColor: '#007AFF', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
     badgeText: { color: '#FFF', fontWeight: '700', fontSize: 13 },
-    commentSection: { backgroundColor: '#FFF', padding: 12, marginHorizontal: 12, marginTop: 10, borderRadius: 8, borderWidth: 1, borderColor: '#EEE' },
-    commentLabel: { fontSize: 14, fontWeight: '600', marginBottom: 6, textAlign: 'right' },
-    commentInput: { minHeight: 60, textAlignVertical: 'top', backgroundColor: '#F9F9F9', padding: 8, borderRadius: 6 },
-    commentWindow: { backgroundColor: '#FFF', padding: 12, marginHorizontal: 12, marginTop: 10, borderRadius: 8, borderWidth: 1, borderColor: '#EEE' },
-    commentWindowHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-    commentSerial: { fontWeight: '700', fontSize: 16 },
-    cameraBtnSmall: { backgroundColor: '#007AFF', flexDirection: 'row', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, alignItems: 'center' },
-    cameraBtnTextSmall: { color: '#fff', marginLeft: 6, fontWeight: '600' },
-    commentRow: { marginTop: 8 },
-    commentFieldLabel: { textAlign: 'right', fontWeight: '600', marginBottom: 6 },
-    commentFieldInput: { backgroundColor: '#F9F9F9', padding: 8, borderRadius: 6, minHeight: 40 },
-    commentRowImage: { marginTop: 10, alignItems: 'flex-end' },
-    commentImageSmall: { width: 90, height: 68, borderRadius: 6, marginLeft: 8 },
-    commentImagePlaceholder: { width: 120, height: 90, borderRadius: 6, backgroundColor: '#F2F2F7', justifyContent: 'center', alignItems: 'center' }
+    headerSection: {
+        backgroundColor: '#E5E5EA',
+        paddingHorizontal: 15,
+        height: HEADER_HEIGHT,
+        justifyContent: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#D1D1D6'
+    },
+    headerText: { fontSize: 16, fontWeight: 'bold', textAlign: 'right' },
+    headerSubText: { fontSize: 12, color: '#6B6B6B', marginTop: 2, textAlign: 'right' },
+    headerRowInner: { flexDirection: 'row-reverse', alignItems: 'center' },
+    floorRowInner: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-start' },
+    floorCameraBtn: { backgroundColor: '#007AFF', padding: 8, borderRadius: 6, marginLeft: 10 },
+    floorSection: {
+        backgroundColor: '#F7F7F9',
+        paddingHorizontal: 20,
+        height: FLOOR_HEIGHT,
+        justifyContent: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#EFEFF3'
+    },
+    parkingFloorSection: {
+        backgroundColor: '#FAFAFC',
+        paddingHorizontal: 20,
+        height: PARKING_SUB_HEIGHT,
+        justifyContent: 'center',
+        borderBottomWidth: 1,
+        borderBottomColor: '#F0F0F5'
+    },
+    parkingFloorText: { fontSize: 13, color: '#666', textAlign: 'right' },
+    floorText: { fontSize: 15, fontWeight: '600', textAlign: 'right', color: '#444' },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        justifyContent: 'flex-end'
+    },
+    modalContainer: {
+        backgroundColor: '#FFF',
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        maxHeight: '85%',
+        paddingBottom: Platform.OS === 'ios' ? 30 : 16
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: '#EEE'
+    },
+    modalCloseBtn: { padding: 4 },
+    modalTitle: { fontSize: 17, fontWeight: '700', color: '#1C1C1E', textAlign: 'center', flex: 1 },
+    modalBody: { paddingHorizontal: 16, paddingTop: 12 },
+    modalFieldLabel: { fontSize: 14, fontWeight: '600', color: '#555', textAlign: 'right', marginBottom: 6, marginTop: 10 },
+    modalLocationText: {
+        fontSize: 14,
+        color: '#333',
+        textAlign: 'right',
+        backgroundColor: '#F2F2F7',
+        padding: 10,
+        borderRadius: 8
+    },
+    modalTextArea: {
+        backgroundColor: '#F9F9F9',
+        borderRadius: 8,
+        padding: 10,
+        minHeight: 90,
+        textAlignVertical: 'top',
+        fontSize: 15,
+        borderWidth: 1,
+        borderColor: '#E5E5EA'
+    },
+    modalInput: {
+        backgroundColor: '#F9F9F9',
+        borderRadius: 8,
+        padding: 10,
+        height: 44,
+        fontSize: 15,
+        borderWidth: 1,
+        borderColor: '#E5E5EA'
+    },
+    modalImage: { width: 100, height: 75, borderRadius: 8, marginRight: 8 },
+    modalCameraBtn: {
+        backgroundColor: '#555',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 10,
+        marginTop: 12,
+        marginBottom: 16
+    },
+    modalCameraBtnText: { color: '#FFF', fontWeight: '600', fontSize: 15, marginLeft: 8 },
+    modalSaveBtn: {
+        backgroundColor: '#007AFF',
+        margin: 16,
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center'
+    },
+    modalSaveBtnText: { color: '#FFF', fontWeight: '700', fontSize: 16 },
+    modalSavedMsg: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        margin: 16,
+        paddingVertical: 14,
+        backgroundColor: '#F0FFF4',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#34C759'
+    },
+    modalSavedText: { color: '#34C759', fontWeight: '700', fontSize: 16, marginLeft: 8 }
 });
