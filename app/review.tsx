@@ -265,7 +265,19 @@ export default function ReviewScreen() {
                                     </View>
                                     <Text style={styles.commentSerial}>ליקוי מס׳: {serial ?? liveItem.id}</Text>
                                     <View style={{ flexDirection: 'row-reverse', alignItems: 'center' }}>
-                                        <TouchableOpacity onPress={() => deleteCommentWindow(liveItem.id)} style={{ marginLeft: 8 }}>
+                                        <TouchableOpacity
+                                            onPress={() =>
+                                                Alert.alert(
+                                                    'מחיקת ליקוי',
+                                                    'האם אתה בטוח שברצונך למחוק ליקוי זה?',
+                                                    [
+                                                        { text: 'ביטול', style: 'cancel' },
+                                                        { text: 'מחק', style: 'destructive', onPress: () => deleteCommentWindow(liveItem.id) }
+                                                    ]
+                                                )
+                                            }
+                                            style={{ marginLeft: 8 }}
+                                        >
                                             <Ionicons name="trash-outline" size={20} color="#FF3B30" />
                                         </TouchableOpacity>
                                         <TouchableOpacity onPress={() => openCameraForItem(liveItem)} style={styles.cameraBtnSmall}>
