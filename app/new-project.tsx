@@ -115,11 +115,11 @@ export default function NewProjectScreen() {
                         >
                             <Ionicons name="close-circle" size={22} color="#FF3B30" />
                         </TouchableOpacity>
-                        <Picker selectedValue={b.floors} onValueChange={(v) => setBuildings(buildings.map(x => x.id === b.id ? { ...x, floors: v } : x))} style={{ width: 100 }}>
+                        <Picker selectedValue={b.floors} onValueChange={(v) => setBuildings(buildings.map(x => x.id === b.id ? { ...x, floors: v } : x))} style={{ width: 140 }}>
                             {Array.from({ length: 51 }, (_, i) => i + 1).map(n => (
                                 <Picker.Item
                                     key={n}
-                                    label={n === 1 ? 'קומה ק' : `קומה ${n - 1}`}
+                                    label={`קומה ${n}`}
                                     value={n}
                                 />
                             ))}
@@ -141,7 +141,7 @@ export default function NewProjectScreen() {
                             <TouchableOpacity onPress={() => setParkings(parkings.filter(x => x.id !== p.id))}><Ionicons name="close-circle" size={22} color="#FF3B30" /></TouchableOpacity>
                             <TextInput style={styles.subNameInput} value={p.name} onChangeText={(v) => setParkings(parkings.map(x => x.id === p.id ? { ...x, name: v } : x))} textAlign="right" />
                         </View>
-                        <Picker selectedValue={p.floors} onValueChange={(v) => setParkings(parkings.map(x => x.id === p.id ? { ...x, floors: v } : x))}>
+                        <Picker selectedValue={p.floors} onValueChange={(v) => setParkings(parkings.map(x => x.id === p.id ? { ...x, floors: v } : x))} style={{ width: 160, alignSelf: 'flex-end' }}>
                             {Array.from({ length: 10 }, (_, i) => i + 1).map(n => <Picker.Item key={n} label={`${n} קומות חניון`} value={n} />)}
                         </Picker>
                         <Text style={styles.subLabel}>אזורים:</Text>

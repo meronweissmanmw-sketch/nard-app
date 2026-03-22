@@ -19,7 +19,6 @@ export default function RootLayout() {
                         options={{ title: 'עריכת דוח' }}
                     />
 
-                    {/* רישום מסך ההגדרות - זה מה שהיה חסר */}
                     <Stack.Screen
                         name="settings"
                         options={{ title: 'הגדרות', presentation: 'card' }}
@@ -35,7 +34,6 @@ export default function RootLayout() {
                         options={{ headerShown: false, presentation: 'fullScreenModal' }}
                     />
 
-                    {/* אם יש לך מסך מודאל להוספת פרויקט, ודא שהוא רשום גם כן */}
                     <Stack.Screen
                         name="modal"
                         options={{ title: 'פרויקט חדש', presentation: 'modal' }}

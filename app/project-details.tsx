@@ -105,33 +105,39 @@ export default function ProjectDetailsScreen() {
             }
 
             const title = r.subject || `דוח ${r.reportNumber}`;
-            const isRtl = false;
+            const isRtl = true;
             const docAlignment = isRtl ? AlignmentType.RIGHT : AlignmentType.LEFT;
             const rtlPara = (text: string, bold = false) =>
                 new Paragraph({
-                    alignment: docAlignment,
-                    bidirectional: isRtl,
-                    children: [new TextRun({ text, rightToLeft: isRtl, bold })],
+                    alignment: AlignmentType.RIGHT,   // ✅ text sticks to right of cell
+                    bidirectional: true,               // ✅ paragraph direction is RTL
+                    children: [new TextRun({ text, rightToLeft: true, bold })],
                 });
 
             const rtlCellPara = (text: string, bold = false) =>
                 new Paragraph({
-                    alignment: docAlignment,
-                    bidirectional: isRtl,
-                    children: [new TextRun({ text, rightToLeft: isRtl, bold })],
+                    alignment: AlignmentType.RIGHT,
+                    bidirectional: true,
+                    children: [new TextRun({ text, rightToLeft: true, bold })],
                 });
 
-            // Header with logo on the left and report meta on the right
+            // Header: logo anchored at top-left, spacer in middle, report meta anchored at top-right
             const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+            const headerTextPara = (text: string, bold = false) =>
+                new Paragraph({
+                    alignment: AlignmentType.RIGHT,
+                    bidirectional: true,
+                    children: [new TextRun({ text, rightToLeft: true, bold })],
+                });
             const headerChildren: (Paragraph | Table)[] = [
                 new Table({
-                    width: { size: 45, type: WidthType.PERCENTAGE },
+                    width: { size: 100, type: WidthType.PERCENTAGE },
                     borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideHorizontal: noBorder, insideVertical: noBorder },
                     rows: [
                         new TableRow({
                             children: [
                                 new TableCell({
-                                    width: { size: 25, type: WidthType.PERCENTAGE },
+                                    width: { size: 15, type: WidthType.PERCENTAGE },
                                     borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
                                     children: [
                                         new Paragraph({
@@ -147,12 +153,17 @@ export default function ProjectDetailsScreen() {
                                     ],
                                 }),
                                 new TableCell({
-                                    width: { size: 75, type: WidthType.PERCENTAGE },
+                                    width: { size: 55, type: WidthType.PERCENTAGE },
+                                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                                    children: [new Paragraph({ text: '' })],
+                                }),
+                                new TableCell({
+                                    width: { size: 30, type: WidthType.PERCENTAGE },
                                     borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
                                     children: [
-                                        rtlPara(`פרויקט: ${project.name || ''}`, true),
-                                        rtlPara(`נושא: ${title}`),
-                                        rtlPara(`תאריך: ${r.date || ''}`),
+                                        headerTextPara(`פרויקט: ${project.name || ''}`, true),
+                                        headerTextPara(`נושא: ${title}`),
+                                        headerTextPara(`תאריך: ${r.date || ''}`),
                                     ],
                                 }),
                             ],
@@ -167,9 +178,9 @@ export default function ProjectDetailsScreen() {
 
             children.push(new Paragraph({
                 heading: HeadingLevel.HEADING_1,
-                alignment: docAlignment,
-                bidirectional: isRtl,
-                children: [new TextRun({ text: title, rightToLeft: isRtl, bold: true })],
+                alignment: AlignmentType.RIGHT,
+                bidirectional: true,
+                children: [new TextRun({ text: title, rightToLeft: true, bold: true })],
             }));
             children.push(rtlPara(`פרויקט: ${project.name || ''}`));
             children.push(rtlPara(`תאריך: ${r.date || ''}`));
@@ -178,9 +189,9 @@ export default function ProjectDetailsScreen() {
             if (r.initialNotes) {
                 children.push(new Paragraph({
                     heading: HeadingLevel.HEADING_3,
-                    alignment: docAlignment,
-                    bidirectional: isRtl,
-                    children: [new TextRun({ text: 'הערת פתיחה', rightToLeft: isRtl, bold: true })],
+                    alignment: AlignmentType.RIGHT,
+                    bidirectional: true,
+                    children: [new TextRun({ text: 'הערת פתיחה', rightToLeft: true, bold: true })],
                 }));
                 children.push(rtlPara(r.initialNotes));
                 children.push(new Paragraph({ text: '' }));
@@ -194,23 +205,23 @@ export default function ProjectDetailsScreen() {
 
                 children.push(new Paragraph({
                     heading: HeadingLevel.HEADING_3,
-                    alignment: docAlignment,
-                    bidirectional: isRtl,
-                    children: [new TextRun({ text: `ליקוי ${idx + 1}`, rightToLeft: isRtl, bold: true })],
+                    alignment: AlignmentType.RIGHT,
+                    bidirectional: true,
+                    children: [new TextRun({ text: `ליקוי ${idx + 1}`, rightToLeft: true, bold: true })],
                 }));
 
                 const makeRow = (label: string, value: string, shaded: boolean) => new TableRow({
                     children: [
                         new TableCell({
-                            borders,
-                            shading: shaded ? { fill: 'F5F5F5' } : undefined,
-                            children: [rtlCellPara(value || '')],
-                        }),
-                        new TableCell({
                             width: { size: 2000, type: WidthType.DXA },
                             borders,
                             shading: shaded ? { fill: 'F5F5F5' } : undefined,
                             children: [rtlCellPara(label, true)],
+                        }),
+                        new TableCell({
+                            borders,
+                            shading: shaded ? { fill: 'F5F5F5' } : undefined,
+                            children: [rtlCellPara(value || '')],
                         }),
                     ],
                 });
@@ -257,9 +268,9 @@ export default function ProjectDetailsScreen() {
             if (r.finalNotes) {
                 children.push(new Paragraph({
                     heading: HeadingLevel.HEADING_3,
-                    alignment: docAlignment,
-                    bidirectional: isRtl,
-                    children: [new TextRun({ text: 'הערת סיום', rightToLeft: isRtl, bold: true })],
+                    alignment: AlignmentType.RIGHT,
+                    bidirectional: true,
+                    children: [new TextRun({ text: 'הערת סיום', rightToLeft: true, bold: true })],
                 }));
                 children.push(rtlPara(r.finalNotes));
             }
