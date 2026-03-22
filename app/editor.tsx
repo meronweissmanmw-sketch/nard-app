@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, FlatList,
-    TextInput, ScrollView, Platform, Image, Alert
+    TextInput, ScrollView, Platform, Image, Alert, Modal
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -15,6 +15,8 @@ const PARKING_SUB_HEIGHT = 28; // small divider for parking floors
 const LOCATION_HEIGHT = 65; // regular clickable rows (building floors / areas)
 const COMMENT_HEIGHT = 120; // start/end comment item
 const COMMENT_WINDOW_HEIGHT = 180; // comment window (likiu) height
+const COMPACT_DEFECT_HEIGHT = 92; // compact defect card shown in walk mode
+const MODAL_SAVE_CONFIRMATION_DURATION = 1200; // ms to show "saved" confirmation before closing modal
 
 export default function EditorScreen() {
     const router = useRouter();
@@ -31,6 +33,15 @@ export default function EditorScreen() {
     const flashIntervalRef = useRef<number | null>(null);
     const viewabilityConfigRef = useRef({ itemVisiblePercentThreshold: 10 });
 
+    // Modal state for editing defect details inline
+    const [defectModalVisible, setDefectModalVisible] = useState(false);
+    const [modalItem, setModalItem] = useState<any>(null);
+    const [modalNotes, setModalNotes] = useState('');
+    const [modalAssignedTo, setModalAssignedTo] = useState('');
+    const [modalSaved, setModalSaved] = useState(false);
+    const [modalSerial, setModalSerial] = useState<number | null>(null);
+    const [pendingModalItemId, setPendingModalItemId] = useState<string | null>(null);
+
     const formatFloorPath = (path: string) => {
         return path
             .replace(/בניין/g, 'ב')
@@ -46,7 +57,50 @@ export default function EditorScreen() {
         }, [projectId, reportId])
     );
 
+    // Open the defect modal when a pending item id is set (e.g. after returning from camera)
+    useEffect(() => {
+        if (pendingModalItemId && report) {
+            const item = (report.items || []).find((it: any) => it.id === pendingModalItemId);
+            if (item) {
+                openDefectModal(item);
+                setPendingModalItemId(null);
+            }
+        }
+    }, [pendingModalItemId, report]);
 
+    const openDefectModal = (item: any) => {
+        setModalItem(item);
+        setModalNotes(item.notes || '');
+        setModalAssignedTo(item.assignedTo || '');
+        setModalSaved(false);
+        // Compute serial once so it doesn't re-run findIndex on every render
+        const serial = report?.items
+            ? report.items.findIndex((x: any) => x.id === item.id) + 1
+            : null;
+        setModalSerial(serial);
+        setDefectModalVisible(true);
+    };
+
+    const saveDefectModal = async () => {
+        if (!modalItem) return;
+        await persistItemField(modalItem.id, { notes: modalNotes, assignedTo: modalAssignedTo });
+        // refresh modal item with updated data
+        setModalItem((prev: any) => ({ ...prev, notes: modalNotes, assignedTo: modalAssignedTo }));
+        setModalSaved(true);
+        setTimeout(() => {
+            setDefectModalVisible(false);
+            setModalSaved(false);
+        }, MODAL_SAVE_CONFIRMATION_DURATION);
+    };
+
+    const openCameraForExistingItem = (it: any) => {
+        if (!projectId || !reportId) {
+            Alert.alert('שגיאה', 'פרויקט או דוח לא מוגדרים');
+            return;
+        }
+        const url = `/camera?projectId=${encodeURIComponent(String(projectId))}&reportId=${encodeURIComponent(String(reportId))}&itemId=${encodeURIComponent(String(it.id))}&locationName=${encodeURIComponent(it.location || '')}`;
+        router.push(url as any);
+    };
 
     const loadData = async () => {
         try {
@@ -88,6 +142,8 @@ export default function EditorScreen() {
                                         startFlash(targetId);
                                     }, 400);
                                 }
+                                // Auto-open the modal so the user can fill in defect details
+                                setPendingModalItemId(target.itemId);
                             }
                             await AsyncStorage.removeItem('cameraReturnTarget');
                         }
@@ -359,8 +415,8 @@ export default function EditorScreen() {
             });
         }
 
-        // Walk mode: only expose structure rows to the FlatList (filter out comment/commentWindow)
-        const walkTree = tree.filter((it: any) => it.type !== 'comment' && it.type !== 'commentWindow');
+        // Walk mode: filter out report-level comment items (opening/closing notes) but keep defect items
+        const walkTree = tree.filter((it: any) => it.type !== 'comment');
         setSections(walkTree);
         return walkTree;
     };
@@ -401,11 +457,11 @@ export default function EditorScreen() {
         let offset = 0;
         for (let i = 0; i < index; i++) {
             const t = data[i]?.type;
-            offset += t === 'header' ? HEADER_HEIGHT : (t === 'floor' ? FLOOR_HEIGHT : (t === 'parkingFloor' ? PARKING_SUB_HEIGHT : (t === 'comment' ? COMMENT_HEIGHT : (t === 'commentWindow' ? COMMENT_WINDOW_HEIGHT : LOCATION_HEIGHT))));
+            offset += t === 'header' ? HEADER_HEIGHT : (t === 'floor' ? FLOOR_HEIGHT : (t === 'parkingFloor' ? PARKING_SUB_HEIGHT : (t === 'comment' ? COMMENT_HEIGHT : (t === 'commentWindow' ? COMPACT_DEFECT_HEIGHT : LOCATION_HEIGHT))));
         }
 
         const tIndex = data[index]?.type;
-        const length = tIndex === 'header' ? HEADER_HEIGHT : (tIndex === 'floor' ? FLOOR_HEIGHT : (tIndex === 'parkingFloor' ? PARKING_SUB_HEIGHT : (tIndex === 'comment' ? COMMENT_HEIGHT : (tIndex === 'commentWindow' ? COMMENT_WINDOW_HEIGHT : LOCATION_HEIGHT))));
+        const length = tIndex === 'header' ? HEADER_HEIGHT : (tIndex === 'floor' ? FLOOR_HEIGHT : (tIndex === 'parkingFloor' ? PARKING_SUB_HEIGHT : (tIndex === 'comment' ? COMMENT_HEIGHT : (tIndex === 'commentWindow' ? COMPACT_DEFECT_HEIGHT : LOCATION_HEIGHT))));
         return { length, offset, index };
     };
 
@@ -483,66 +539,26 @@ export default function EditorScreen() {
                         const liveItem = (report?.items || []).find((x: any) => x.id === it.id) || it;
                         // compute serial based on current report items order
                         const serial = report?.items ? (report.items.findIndex((x: any) => x.id === it.id) + 1) : undefined;
-                        const isHighlighted = highlightedId === item.id || highlightedId === item.item?.id || highlightedId === item.id;
+                        const isHighlighted = highlightedId === item.id;
                         return (
-                            <View style={[styles.commentWindow, (isHighlighted && highlightOn) ? styles.highlightedItem : null]}>
-                                <View style={styles.commentWindowHeader}>
-                                    <Text style={styles.commentSerial}>ליכוי מס: {serial ?? liveItem.id}</Text>
-                                    <View style={{ flexDirection: 'row-reverse', alignItems: 'center' }}>
+                            <View style={[styles.compactDefectCard, (isHighlighted && highlightOn) ? styles.highlightedItem : null]}>
+                                <View style={styles.compactDefectHeader}>
+                                    <Text style={styles.commentSerial}>ליקוי מס׳ {serial ?? liveItem.id}</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                         <TouchableOpacity onPress={() => deleteCommentWindow(liveItem.id)} style={{ marginLeft: 8 }}>
-                                            <Ionicons name="trash-outline" size={20} color="#FF3B30" />
+                                            <Ionicons name="trash-outline" size={18} color="#FF3B30" />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity style={styles.editBtn} onPress={() => openDefectModal(liveItem)}>
+                                            <Ionicons name="create-outline" size={14} color="white" />
+                                            <Text style={styles.editBtnText}>עריכה</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
-
-                                <View style={styles.commentRow}>
-                                    <Text style={styles.commentFieldLabel}>מיקום:</Text>
-                                    <TextInput
-                                        style={[styles.commentFieldInput, { minHeight: 36 }]}
-                                        value={liveItem.location}
-                                        onChangeText={(txt) => setReport((prev: any) => ({ ...prev, items: (prev.items || []).map((x: any) => x.id === liveItem.id ? { ...x, location: txt } : x) }))}
-                                        onEndEditing={(e) => persistItemField(liveItem.id, { location: e.nativeEvent.text })}
-                                        placeholder="מיקום"
-                                        textAlign='right'
-                                    />
-                                </View>
-
-                                <View style={styles.commentRow}>
-                                    <Text style={styles.commentFieldLabel}>הערות:</Text>
-                                    <TextInput
-                                        style={styles.commentFieldInput}
-                                        multiline
-                                        value={liveItem.notes}
-                                        onChangeText={(txt) => setReport((prev: any) => ({ ...prev, items: (prev.items || []).map((x: any) => x.id === liveItem.id ? { ...x, notes: txt } : x) }))}
-                                        onEndEditing={(e) => persistItemField(liveItem.id, { notes: e.nativeEvent.text })}
-                                        placeholder="הערות"
-                                        textAlign='right'
-                                    />
-                                </View>
-
-                                <View style={styles.commentRow}>
-                                    <Text style={styles.commentFieldLabel}>אחראי לתיקון:</Text>
-                                    <TextInput
-                                        style={[styles.commentFieldInput, { height: 36 }]}
-                                        value={liveItem.assignedTo}
-                                        onChangeText={(txt) => setReport((prev: any) => ({ ...prev, items: (prev.items || []).map((x: any) => x.id === liveItem.id ? { ...x, assignedTo: txt } : x) }))}
-                                        onEndEditing={(e) => persistItemField(liveItem.id, { assignedTo: e.nativeEvent.text })}
-                                        placeholder="אחראי"
-                                        textAlign='right'
-                                    />
-                                </View>
-
-                                <View style={styles.commentRowImage}>
-                                    {liveItem.images && liveItem.images.length > 0 ? (
-                                        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                                            {liveItem.images.map((uri: string, i: number) => (
-                                                <Image key={i} source={{ uri }} style={styles.commentImageSmall} />
-                                            ))}
-                                        </ScrollView>
-                                    ) : (
-                                        <View style={styles.commentImagePlaceholder}><Text style={{ color: '#999' }}>אין תמונה</Text></View>
-                                    )}
-                                </View>
+                                <Text style={styles.compactDefectLocation} numberOfLines={1}>{liveItem.location}</Text>
+                                {liveItem.notes
+                                    ? <Text style={styles.compactDefectNotes} numberOfLines={1}>{liveItem.notes}</Text>
+                                    : <Text style={styles.compactDefectNoNotes}>לחץ עריכה להוספת פרטים</Text>
+                                }
                             </View>
                         );
                     }
@@ -627,6 +643,88 @@ export default function EditorScreen() {
                     );
                 }}
             />
+
+            {/* Defect detail modal - opens automatically after camera capture or when tapping Edit */}
+            <Modal
+                visible={defectModalVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setDefectModalVisible(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalContainer}>
+                        <View style={styles.modalHeader}>
+                            <TouchableOpacity onPress={() => setDefectModalVisible(false)} style={styles.modalCloseBtn}>
+                                <Ionicons name="close" size={24} color="#666" />
+                            </TouchableOpacity>
+                            <Text style={styles.modalTitle}>
+                                {modalSerial != null ? `ליקוי מס׳ ${modalSerial}` : 'עריכת ליקוי'}
+                            </Text>
+                            <View style={{ width: 40 }} />
+                        </View>
+
+                        {modalItem && (
+                            <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
+                                <Text style={styles.modalFieldLabel}>מיקום:</Text>
+                                <Text style={styles.modalLocationText}>{modalItem.location}</Text>
+
+                                <Text style={styles.modalFieldLabel}>הערות:</Text>
+                                <TextInput
+                                    style={styles.modalTextArea}
+                                    multiline
+                                    value={modalNotes}
+                                    onChangeText={setModalNotes}
+                                    placeholder="הזן הערות על הליקוי"
+                                    textAlign="right"
+                                    textAlignVertical="top"
+                                />
+
+                                <Text style={styles.modalFieldLabel}>אחראי לתיקון:</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    value={modalAssignedTo}
+                                    onChangeText={setModalAssignedTo}
+                                    placeholder="שם האחראי לתיקון"
+                                    textAlign="right"
+                                />
+
+                                {modalItem.images && modalItem.images.length > 0 && (
+                                    <>
+                                        <Text style={styles.modalFieldLabel}>תמונות ({modalItem.images.length}):</Text>
+                                        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 12 }}>
+                                            {modalItem.images.map((uri: string, i: number) => (
+                                                <Image key={i} source={{ uri }} style={styles.modalImage} />
+                                            ))}
+                                        </ScrollView>
+                                    </>
+                                )}
+
+                                <TouchableOpacity
+                                    style={styles.modalCameraBtn}
+                                    onPress={() => {
+                                        setDefectModalVisible(false);
+                                        openCameraForExistingItem(modalItem);
+                                    }}
+                                >
+                                    <Ionicons name="camera" size={18} color="white" />
+                                    <Text style={styles.modalCameraBtnText}>הוסף / עדכן צילום</Text>
+                                </TouchableOpacity>
+                            </ScrollView>
+                        )}
+
+                        {modalSaved ? (
+                            <View style={styles.modalSavedMsg}>
+                                <Ionicons name="checkmark-circle" size={22} color="#34C759" />
+                                <Text style={styles.modalSavedText}>הליקוי נשמר בהצלחה ✓</Text>
+                            </View>
+                        ) : (
+                            <TouchableOpacity style={styles.modalSaveBtn} onPress={saveDefectModal}>
+                                <Text style={styles.modalSaveBtnText}>שמור ליקוי</Text>
+                            </TouchableOpacity>
+                        )}
+                    </View>
+                </View>
+            </Modal>
 
         </View>
     );
@@ -751,6 +849,121 @@ const styles = StyleSheet.create({
     reviewBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F0FF', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginLeft: 8 },
     reviewBtnText: { color: '#007AFF', fontWeight: '600', fontSize: 13 },
     reviewBadge: { backgroundColor: '#007AFF', borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', marginLeft: 4, paddingHorizontal: 4 },
-    reviewBadgeText: { color: '#FFF', fontWeight: '700', fontSize: 12 }
+    reviewBadgeText: { color: '#FFF', fontWeight: '700', fontSize: 12 },
+    // Compact defect card (shown in walk mode list)
+    compactDefectCard: {
+        height: COMPACT_DEFECT_HEIGHT,
+        backgroundColor: '#FFF',
+        paddingHorizontal: 12,
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#E8E8ED',
+        overflow: 'hidden'
+    },
+    compactDefectHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 4
+    },
+    compactDefectLocation: { fontSize: 12, color: '#666', textAlign: 'right', marginBottom: 2 },
+    compactDefectNotes: { fontSize: 13, color: '#333', textAlign: 'right' },
+    compactDefectNoNotes: { fontSize: 12, color: '#999', fontStyle: 'italic', textAlign: 'right' },
+    editBtn: {
+        backgroundColor: '#007AFF',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 6,
+        marginLeft: 6
+    },
+    editBtnText: { color: '#FFF', fontSize: 12, fontWeight: '600', marginLeft: 4 },
+    // Modal styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+        justifyContent: 'flex-end'
+    },
+    modalContainer: {
+        backgroundColor: '#FFF',
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
+        maxHeight: '85%',
+        paddingBottom: Platform.OS === 'ios' ? 30 : 16
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingVertical: 14,
+        borderBottomWidth: 1,
+        borderBottomColor: '#EEE'
+    },
+    modalCloseBtn: { padding: 4 },
+    modalTitle: { fontSize: 17, fontWeight: '700', color: '#1C1C1E', textAlign: 'center', flex: 1 },
+    modalBody: { paddingHorizontal: 16, paddingTop: 12 },
+    modalFieldLabel: { fontSize: 14, fontWeight: '600', color: '#555', textAlign: 'right', marginBottom: 6, marginTop: 10 },
+    modalLocationText: {
+        fontSize: 14,
+        color: '#333',
+        textAlign: 'right',
+        backgroundColor: '#F2F2F7',
+        padding: 10,
+        borderRadius: 8
+    },
+    modalTextArea: {
+        backgroundColor: '#F9F9F9',
+        borderRadius: 8,
+        padding: 10,
+        minHeight: 90,
+        textAlignVertical: 'top',
+        fontSize: 15,
+        borderWidth: 1,
+        borderColor: '#E5E5EA'
+    },
+    modalInput: {
+        backgroundColor: '#F9F9F9',
+        borderRadius: 8,
+        padding: 10,
+        height: 44,
+        fontSize: 15,
+        borderWidth: 1,
+        borderColor: '#E5E5EA'
+    },
+    modalImage: { width: 100, height: 75, borderRadius: 8, marginRight: 8 },
+    modalCameraBtn: {
+        backgroundColor: '#555',
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 10,
+        marginTop: 12,
+        marginBottom: 16
+    },
+    modalCameraBtnText: { color: '#FFF', fontWeight: '600', fontSize: 15, marginLeft: 8 },
+    modalSaveBtn: {
+        backgroundColor: '#007AFF',
+        margin: 16,
+        paddingVertical: 14,
+        borderRadius: 12,
+        alignItems: 'center'
+    },
+    modalSaveBtnText: { color: '#FFF', fontSize: 17, fontWeight: '700' },
+    modalSavedMsg: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        margin: 16,
+        paddingVertical: 14,
+        backgroundColor: '#F0FFF4',
+        borderRadius: 12,
+        borderWidth: 1,
+        borderColor: '#34C759'
+    },
+    modalSavedText: { color: '#34C759', fontSize: 16, fontWeight: '700', marginLeft: 8 }
 });
+
 
