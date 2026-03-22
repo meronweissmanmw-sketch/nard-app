@@ -154,6 +154,37 @@ export default function ReviewScreen() {
         }
     };
 
+    const reorderItem = async (itemId: string, direction: 'up' | 'down') => {
+        try {
+            const items = [...(report?.items || [])];
+            const idx = items.findIndex((it: any) => it.id === itemId);
+            if (idx === -1) return;
+            const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+            if (swapIdx < 0 || swapIdx >= items.length) return;
+            [items[idx], items[swapIdx]] = [items[swapIdx], items[idx]];
+
+            const data = await AsyncStorage.getItem('projects');
+            if (!data) return;
+            const projects = JSON.parse(data);
+            const updated = projects.map((p: any) => {
+                if (p.id !== projectId) return p;
+                return {
+                    ...p,
+                    reports: (p.reports || []).map((r: any) => {
+                        if (r.id !== reportId) return r;
+                        return { ...r, items };
+                    })
+                };
+            });
+            await AsyncStorage.setItem('projects', JSON.stringify(updated));
+            const newReport = { ...report, items };
+            setReport(newReport);
+            buildReviewList(newReport);
+        } catch (e) {
+            console.error('Failed to reorder item', e);
+        }
+    };
+
     const openCameraForItem = (it: any) => {
         if (!projectId || !reportId) {
             Alert.alert('שגיאה', 'פרויקט או דוח לא מוגדרים');
@@ -211,12 +242,42 @@ export default function ReviewScreen() {
                         const it = item.item;
                         const liveItem = (report?.items || []).find((x: any) => x.id === it.id) || it;
                         const serial = item.serial;
+                        const totalItems = report?.items?.length || 0;
+                        const currentIndex = (serial ?? 1) - 1;
                         return (
                             <View style={styles.commentWindow}>
                                 <View style={styles.commentWindowHeader}>
+                                    <View style={styles.reorderButtons}>
+                                        <TouchableOpacity
+                                            onPress={() => reorderItem(liveItem.id, 'up')}
+                                            disabled={currentIndex <= 0}
+                                            style={[styles.reorderBtn, currentIndex <= 0 && styles.reorderBtnDisabled]}
+                                        >
+                                            <Ionicons name="chevron-up" size={18} color={currentIndex <= 0 ? '#CCC' : '#555'} />
+                                        </TouchableOpacity>
+                                        <TouchableOpacity
+                                            onPress={() => reorderItem(liveItem.id, 'down')}
+                                            disabled={currentIndex >= totalItems - 1}
+                                            style={[styles.reorderBtn, currentIndex >= totalItems - 1 && styles.reorderBtnDisabled]}
+                                        >
+                                            <Ionicons name="chevron-down" size={18} color={currentIndex >= totalItems - 1 ? '#CCC' : '#555'} />
+                                        </TouchableOpacity>
+                                    </View>
                                     <Text style={styles.commentSerial}>ליקוי מס׳: {serial ?? liveItem.id}</Text>
                                     <View style={{ flexDirection: 'row-reverse', alignItems: 'center' }}>
-                                        <TouchableOpacity onPress={() => deleteCommentWindow(liveItem.id)} style={{ marginLeft: 8 }}>
+                                        <TouchableOpacity
+                                            onPress={() =>
+                                                Alert.alert(
+                                                    'מחיקת ליקוי',
+                                                    'האם אתה בטוח שברצונך למחוק ליקוי זה?',
+                                                    [
+                                                        { text: 'ביטול', style: 'cancel' },
+                                                        { text: 'מחק', style: 'destructive', onPress: () => deleteCommentWindow(liveItem.id) }
+                                                    ]
+                                                )
+                                            }
+                                            style={{ marginLeft: 8 }}
+                                        >
                                             <Ionicons name="trash-outline" size={20} color="#FF3B30" />
                                         </TouchableOpacity>
                                         <TouchableOpacity onPress={() => openCameraForItem(liveItem)} style={styles.cameraBtnSmall}>
@@ -310,6 +371,9 @@ const styles = StyleSheet.create({
     commentWindow: { backgroundColor: '#FFF', padding: 12, marginHorizontal: 12, marginTop: 10, borderRadius: 8, borderWidth: 1, borderColor: '#EEE' },
     commentWindowHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
     commentSerial: { fontWeight: '700', fontSize: 16 },
+    reorderButtons: { flexDirection: 'column', alignItems: 'center', marginLeft: 4 },
+    reorderBtn: { padding: 2 },
+    reorderBtnDisabled: { opacity: 0.3 },
     cameraBtnSmall: { backgroundColor: '#007AFF', flexDirection: 'row', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, alignItems: 'center' },
     cameraBtnTextSmall: { color: '#fff', marginLeft: 6, fontWeight: '600' },
     commentRow: { marginTop: 8 },
