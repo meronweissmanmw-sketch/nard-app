@@ -1,0 +1,50 @@
+{
+  "expo": {
+    "name": "Nard App",
+    "slug": "nard-app",
+    "scheme": "nard-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "plugins": [
+      "expo-router",
+      "expo-camera",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Nard to access your photos to attach defect images."
+        }
+      ]
+    ],
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.nardapp.inspection",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.nardapp.inspection",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Used to photograph construction defects.",
+        "NSPhotoLibraryUsageDescription": "Used to attach defect photos to reports.",
+        "NSPhotoLibraryAddUsageDescription": "Used to save report images."
+      }
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.VisualStudio.JavaScript.Sdk/1.0.0">
+  <PropertyGroup>
+    <!-- Command Visual Studio runs when you press F5 / Start -->
+    <StartupCommand>npx expo start</StartupCommand>
+    <!-- Tell VS which directory contains package.json -->
+    <ProjectView>RootFiles</ProjectView>
+    <!-- Disable VS build system; Expo handles its own bundling -->
+    <ShouldRunBuildScript>false</ShouldRunBuildScript>
+  </PropertyGroup>
+</Project>

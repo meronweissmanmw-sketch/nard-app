@@ -454,8 +454,10 @@ export default function EditorScreen() {
             });
         }
 
-        setSections(tree);
-        return tree;
+        // Walk mode: only expose structure rows to the FlatList (filter out comment/commentWindow)
+        const walkTree = tree.filter((it: any) => it.type !== 'comment' && it.type !== 'commentWindow');
+        setSections(walkTree);
+        return walkTree;
     };
 
     const scrollToLocation = (index: number) => {
@@ -540,6 +542,17 @@ export default function EditorScreen() {
                         <View style={styles.headerRow}>
                             <TouchableOpacity onPress={() => setNavVisible(true)}>
                                 <Ionicons name="menu" size={28} color="#007AFF" />
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.reviewBtn}
+                                onPress={() => router.push(`/review?projectId=${encodeURIComponent(String(projectId))}&reportId=${encodeURIComponent(String(reportId))}` as any)}
+                            >
+                                <Text style={styles.reviewBtnText}>סקירת ליקויים</Text>
+                                {(report?.items?.length || 0) > 0 && (
+                                    <View style={styles.reviewBadge}>
+                                        <Text style={styles.reviewBadgeText}>{report.items.length}</Text>
+                                    </View>
+                                )}
                             </TouchableOpacity>
                             <View style={{ flex: 1, alignItems: 'flex-end', marginLeft: 15 }}>
                                 <Text style={styles.projectLabel}>{project?.name}</Text>
@@ -925,6 +938,10 @@ const styles = StyleSheet.create({
     navItem: { flexDirection: 'row-reverse', padding: 15, borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
     navItemHeader: { backgroundColor: '#F9F9F9' },
     navItemText: { fontSize: 17, textAlign: 'right', flex: 1 },
-    navItemHeaderText: { fontWeight: 'bold', color: '#8E8E93' }
+    navItemHeaderText: { fontWeight: 'bold', color: '#8E8E93' },
+    reviewBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F0FF', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginLeft: 8 },
+    reviewBtnText: { color: '#007AFF', fontWeight: '600', fontSize: 13 },
+    reviewBadge: { backgroundColor: '#007AFF', borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', marginLeft: 4, paddingHorizontal: 4 },
+    reviewBadgeText: { color: '#FFF', fontWeight: '700', fontSize: 12 }
 });
 

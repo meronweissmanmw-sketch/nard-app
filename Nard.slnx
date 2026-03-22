@@ -1,5 +1,5 @@
 <Solution>
-  <Project Path="Nard/nard.esproj">
+  <Project Path="nard.esproj">
     <Build />
     <Deploy />
   </Project>
