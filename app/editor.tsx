@@ -1,13 +1,12 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, FlatList,
-    TextInput, ScrollView, Platform, Image, Alert, Modal, Switch
+    TextInput, ScrollView, Platform, Image, Alert, Modal
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Picker } from '@react-native-picker/picker';
 
 // קבועים עבור חישובי גובה - קריטי למניעת קריסות באנדרואיד
 const HEADER_HEIGHT = 40; // reduced header height to save space
@@ -232,14 +231,6 @@ export default function EditorScreen() {
 
     const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
 
-    // Structure editor modal state
-    const [structureModalVisible, setStructureModalVisible] = useState(false);
-    const [editBuildings, setEditBuildings] = useState<any[]>([]);
-    const [editHasParking, setEditHasParking] = useState(false);
-    const [editParkings, setEditParkings] = useState<any[]>([]);
-    const [editHasDevelopment, setEditHasDevelopment] = useState(false);
-    const [editDevAreas, setEditDevAreas] = useState<any[]>([]);
-
     const persistReportField = async (field: 'initialNotes' | 'finalNotes' | 'subject', value: string) => {
         try {
             // update local state
@@ -258,42 +249,6 @@ export default function EditorScreen() {
             await AsyncStorage.setItem('projects', JSON.stringify(updated));
         } catch (e) {
             console.error('Failed to persist report field', e);
-        }
-    };
-
-    const openStructureEditor = () => {
-        if (!project?.structure) return;
-        const s = project.structure;
-        setEditBuildings(s.buildings ? s.buildings.map((b: any) => ({ ...b })) : [{ id: `b-${Date.now()}`, name: 'בניין 1', floors: 1 }]);
-        setEditHasParking(!!(s.parkings && s.parkings.length > 0));
-        setEditParkings(s.parkings ? s.parkings.map((p: any) => ({ ...p, areas: p.areas ? p.areas.map((a: any) => ({ ...a })) : [] })) : []);
-        setEditHasDevelopment(!!(s.development));
-        setEditDevAreas(s.development?.areas ? s.development.areas.map((a: any) => ({ ...a })) : []);
-        setStructureModalVisible(true);
-    };
-
-    const saveStructure = async () => {
-        try {
-            const newStructure = {
-                buildings: editBuildings.map((b: any) => ({ ...b, floors: Number(b.floors) })),
-                parkings: editHasParking ? editParkings.map((p: any) => ({ ...p, floors: Number(p.floors) })) : [],
-                development: editHasDevelopment ? { areas: editDevAreas } : null
-            };
-            const data = await AsyncStorage.getItem('projects');
-            if (!data) return;
-            const projects = JSON.parse(data);
-            const updated = projects.map((p: any) => {
-                if (p.id !== projectId) return p;
-                return { ...p, structure: newStructure };
-            });
-            await AsyncStorage.setItem('projects', JSON.stringify(updated));
-            const updatedProject = { ...project, structure: newStructure };
-            setProject(updatedProject);
-            setStructureModalVisible(false);
-            buildLocationTree(newStructure, report);
-        } catch (e) {
-            console.error('Failed to save structure', e);
-            Alert.alert('שגיאה', 'לא ניתן לשמור את המבנה');
         }
     };
 
@@ -530,10 +485,6 @@ export default function EditorScreen() {
                                     <Text style={styles.reviewBadgeText}>{report.items.length}</Text>
                                 </View>
                             )}
-                        </TouchableOpacity>
-                        <TouchableOpacity style={[styles.reviewBtn, { marginTop: 6 }]} onPress={openStructureEditor}>
-                            <Ionicons name="construct-outline" size={14} color="#007AFF" style={{ marginRight: 4 }} />
-                            <Text style={styles.reviewBtnText}>עריכת מבנה</Text>
                         </TouchableOpacity>
                     </View>
 
@@ -783,173 +734,6 @@ export default function EditorScreen() {
                 </View>
             </Modal>
 
-            {/* Structure editor modal */}
-            <Modal
-                visible={structureModalVisible}
-                transparent
-                animationType="slide"
-                onRequestClose={() => setStructureModalVisible(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContainer, { maxHeight: '92%' }]}>
-                        <View style={styles.modalHeader}>
-                            <TouchableOpacity onPress={() => setStructureModalVisible(false)} style={styles.modalCloseBtn}>
-                                <Ionicons name="close" size={24} color="#666" />
-                            </TouchableOpacity>
-                            <Text style={styles.modalTitle}>עריכת מבנה הפרויקט</Text>
-                            <View style={{ width: 40 }} />
-                        </View>
-
-                        <ScrollView style={styles.modalBody} keyboardShouldPersistTaps="handled">
-                            {/* Buildings */}
-                            <View style={styles.structSection}>
-                                <View style={styles.structHeaderRow}>
-                                    <TouchableOpacity onPress={() => setEditBuildings([
-                                        ...editBuildings,
-                                        { id: `b-${Date.now()}-${Math.floor(Math.random() * 1000)}`, name: `בניין ${editBuildings.length + 1}`, floors: 1 }
-                                    ])}>
-                                        <Ionicons name="add-circle" size={26} color="#007AFF" />
-                                    </TouchableOpacity>
-                                    <Text style={styles.structHeader}>בניינים</Text>
-                                </View>
-                                {editBuildings.map((b: any) => (
-                                    <View key={b.id} style={styles.structBuildingCard}>
-                                        <TouchableOpacity
-                                            onPress={() => editBuildings.length > 1 ? setEditBuildings(editBuildings.filter((x: any) => x.id !== b.id)) : null}
-                                            style={{ marginRight: 8 }}
-                                        >
-                                            <Ionicons name="close-circle" size={20} color="#FF3B30" />
-                                        </TouchableOpacity>
-                                        <Picker
-                                            selectedValue={b.floors}
-                                            onValueChange={(v) => setEditBuildings(editBuildings.map((x: any) => x.id === b.id ? { ...x, floors: v } : x))}
-                                            style={{ width: 130 }}
-                                        >
-                                            {Array.from({ length: 51 }, (_, i) => i + 1).map(n => (
-                                                <Picker.Item key={n} label={`קומה ${n}`} value={n} />
-                                            ))}
-                                        </Picker>
-                                        <TextInput
-                                            style={styles.structNameInput}
-                                            value={b.name}
-                                            onChangeText={(val) => setEditBuildings(editBuildings.map((x: any) => x.id === b.id ? { ...x, name: val } : x))}
-                                            textAlign="right"
-                                        />
-                                    </View>
-                                ))}
-                            </View>
-
-                            {/* Parkings */}
-                            <View style={styles.structSection}>
-                                <View style={styles.structSwitchRow}>
-                                    <Switch
-                                        value={editHasParking}
-                                        onValueChange={(val) => {
-                                            setEditHasParking(val);
-                                            if (val && editParkings.length === 0) {
-                                                setEditParkings([{ id: Date.now().toString(), name: 'חניון 1', floors: 1, areas: [] }]);
-                                            }
-                                        }}
-                                    />
-                                    <Text style={styles.structHeader}>חניונים</Text>
-                                </View>
-                                {editHasParking && editParkings.map((p: any) => (
-                                    <View key={p.id} style={styles.structSubCard}>
-                                        <View style={styles.structHeaderRow}>
-                                            <TouchableOpacity onPress={() => setEditParkings(editParkings.filter((x: any) => x.id !== p.id))}>
-                                                <Ionicons name="close-circle" size={20} color="#FF3B30" />
-                                            </TouchableOpacity>
-                                            <TextInput
-                                                style={styles.structSubNameInput}
-                                                value={p.name}
-                                                onChangeText={(v) => setEditParkings(editParkings.map((x: any) => x.id === p.id ? { ...x, name: v } : x))}
-                                                textAlign="right"
-                                            />
-                                        </View>
-                                        <Picker
-                                            selectedValue={p.floors}
-                                            onValueChange={(v) => setEditParkings(editParkings.map((x: any) => x.id === p.id ? { ...x, floors: v } : x))}
-                                            style={{ width: 160, alignSelf: 'flex-end' }}
-                                        >
-                                            {Array.from({ length: 10 }, (_, i) => i + 1).map(n => (
-                                                <Picker.Item key={n} label={`${n} קומות חניון`} value={n} />
-                                            ))}
-                                        </Picker>
-                                        <Text style={styles.structSubLabel}>אזורים:</Text>
-                                        {p.areas.map((a: any) => (
-                                            <View key={a.id} style={styles.structAreaRow}>
-                                                <TouchableOpacity onPress={() => setEditParkings(editParkings.map((pk: any) => pk.id === p.id ? { ...pk, areas: pk.areas.filter((ar: any) => ar.id !== a.id) } : pk))}>
-                                                    <Ionicons name="close-circle" size={16} color="#999" style={{ marginRight: 5 }} />
-                                                </TouchableOpacity>
-                                                <TextInput
-                                                    style={styles.structAreaInput}
-                                                    value={a.name}
-                                                    onChangeText={(v) => setEditParkings(editParkings.map((pk: any) => pk.id === p.id ? { ...pk, areas: pk.areas.map((ar: any) => ar.id === a.id ? { ...ar, name: v } : ar) } : pk))}
-                                                    textAlign="right"
-                                                />
-                                            </View>
-                                        ))}
-                                        <TouchableOpacity onPress={() => setEditParkings(editParkings.map((pk: any) => pk.id === p.id ? { ...pk, areas: [...pk.areas, { id: Date.now().toString(), name: 'אזור חדש' }] } : pk))}>
-                                            <Text style={styles.structAddText}>+ הוסף אזור</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                ))}
-                                {editHasParking && (
-                                    <TouchableOpacity
-                                        onPress={() => setEditParkings([...editParkings, { id: Date.now().toString(), name: `חניון ${editParkings.length + 1}`, floors: 1, areas: [] }])}
-                                        style={styles.structDashedBtn}
-                                    >
-                                        <Text style={{ color: '#007AFF' }}>+ חניון נוסף</Text>
-                                    </TouchableOpacity>
-                                )}
-                            </View>
-
-                            {/* Development */}
-                            <View style={styles.structSection}>
-                                <View style={styles.structSwitchRow}>
-                                    <Switch
-                                        value={editHasDevelopment}
-                                        onValueChange={(val) => {
-                                            setEditHasDevelopment(val);
-                                            if (val && editDevAreas.length === 0) {
-                                                setEditDevAreas([{ id: Date.now().toString(), name: 'אזור כללי' }]);
-                                            }
-                                        }}
-                                    />
-                                    <Text style={styles.structHeader}>פיתוח חוץ</Text>
-                                </View>
-                                {editHasDevelopment && (
-                                    <View style={{ marginTop: 8 }}>
-                                        {editDevAreas.map((a: any) => (
-                                            <View key={a.id} style={styles.structAreaRow}>
-                                                <TouchableOpacity onPress={() => setEditDevAreas(editDevAreas.filter((ar: any) => ar.id !== a.id))}>
-                                                    <Ionicons name="close-circle" size={16} color="#999" style={{ marginRight: 5 }} />
-                                                </TouchableOpacity>
-                                                <TextInput
-                                                    style={styles.structAreaInput}
-                                                    value={a.name}
-                                                    onChangeText={(v) => setEditDevAreas(editDevAreas.map((ar: any) => ar.id === a.id ? { ...ar, name: v } : ar))}
-                                                    textAlign="right"
-                                                />
-                                            </View>
-                                        ))}
-                                        <TouchableOpacity onPress={() => setEditDevAreas([...editDevAreas, { id: Date.now().toString(), name: 'אזור חדש' }])}>
-                                            <Text style={styles.structAddText}>+ הוסף אזור פיתוח</Text>
-                                        </TouchableOpacity>
-                                    </View>
-                                )}
-                            </View>
-
-                            <View style={{ height: 20 }} />
-                        </ScrollView>
-
-                        <TouchableOpacity style={styles.modalSaveBtn} onPress={saveStructure}>
-                            <Text style={styles.modalSaveBtnText}>שמור מבנה</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
-
         </View>
     );
 }
@@ -1188,20 +972,6 @@ const styles = StyleSheet.create({
         borderColor: '#34C759'
     },
     modalSavedText: { color: '#34C759', fontSize: 16, fontWeight: '700', marginLeft: 8 },
-    // Structure editor modal styles
-    structSection: { backgroundColor: '#F9F9F9', borderRadius: 10, padding: 12, marginBottom: 12, borderWidth: 1, borderColor: '#EEE' },
-    structHeader: { fontSize: 16, fontWeight: 'bold', textAlign: 'right' },
-    structHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
-    structSwitchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-    structBuildingCard: { flexDirection: 'row', alignItems: 'center', paddingVertical: 6, borderBottomWidth: 1, borderBottomColor: '#EEE' },
-    structNameInput: { fontSize: 15, fontWeight: '600', flex: 1, textAlign: 'right', borderBottomWidth: 1, borderBottomColor: '#DDD', paddingVertical: 4 },
-    structSubCard: { backgroundColor: '#FFF', padding: 10, borderRadius: 8, marginTop: 10, borderWidth: 1, borderColor: '#EEE' },
-    structSubNameInput: { fontWeight: 'bold', fontSize: 15, textAlign: 'right', flex: 1, marginLeft: 10 },
-    structSubLabel: { textAlign: 'right', fontSize: 12, color: '#8E8E93', marginVertical: 4 },
-    structAreaRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
-    structAreaInput: { backgroundColor: '#F9F9F9', padding: 6, borderRadius: 5, flex: 1, marginLeft: 8, borderWidth: 1, borderColor: '#EEE' },
-    structAddText: { color: '#007AFF', textAlign: 'right', fontWeight: 'bold', marginTop: 6 },
-    structDashedBtn: { alignItems: 'center', padding: 10, marginTop: 8, borderStyle: 'dashed', borderWidth: 1, borderColor: '#007AFF', borderRadius: 8 },
 });
 
 
