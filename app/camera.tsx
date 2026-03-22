@@ -59,13 +59,13 @@ export default function CameraScreen() {
                                         createdItemId = rep.items[itIdx].id;
                                     } else {
                                         // itemId provided but not found: create it
-                                        const newIt = { id: itemId as string, location: locationName || '', notes: '', images: [photo.uri], assignedTo: '' };
+                                        const newIt = { id: itemId as string, location: locationName || '', notes: '', images: [photo.uri], assignedTo: '', status: 'open', priority: 'medium' };
                                         rep.items.push(newIt);
                                         createdItemId = newIt.id;
                                     }
                                 } else {
                                     // create new item in report
-                                    const newItem = { id: Date.now().toString(), location: locationName || '', notes: '', images: [photo.uri], assignedTo: '' };
+                                    const newItem = { id: Date.now().toString(), location: locationName || '', notes: '', images: [photo.uri], assignedTo: '', status: 'open', priority: 'medium' };
                                     rep.items.push(newItem);
                                     createdItemId = newItem.id;
                                 }
