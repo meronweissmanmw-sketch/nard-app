@@ -1,7 +1,7 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity, FlatList,
-    Modal, TextInput, ScrollView, Platform, Image, Alert
+    TextInput, ScrollView, Platform, Image, Alert
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -24,22 +24,12 @@ export default function EditorScreen() {
     const [project, setProject] = useState<any>(null);
     const [report, setReport] = useState<any>(null);
     const [sections, setSections] = useState<any[]>([]);
-    
-    const [isNavVisible, setNavVisible] = useState(false);
+
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [highlightedId, setHighlightedId] = useState<string | null>(null);
     const [highlightOn, setHighlightOn] = useState<boolean>(true);
-    const [activeFloorPath, setActiveFloorPath] = useState<string>('');
     const flashIntervalRef = useRef<number | null>(null);
     const viewabilityConfigRef = useRef({ itemVisiblePercentThreshold: 10 });
-    const onViewableItemsChangedRef = useRef(({ viewableItems }: any) => {
-        const v = viewableItems?.map((x: any) => x.item) || [];
-        const floorItem = v.find((it: any) => it?.type === 'floor' && (it.fullLocation || it.label));
-        const nextPath = floorItem?.fullLocation || floorItem?.label || '';
-        if (nextPath) {
-            setActiveFloorPath((prev) => (prev === nextPath ? prev : nextPath));
-        }
-    });
 
     const formatFloorPath = (path: string) => {
         return path
@@ -56,7 +46,7 @@ export default function EditorScreen() {
         }, [projectId, reportId])
     );
 
-    
+
 
     const loadData = async () => {
         try {
@@ -87,7 +77,7 @@ export default function EditorScreen() {
                     // check if camera created/updated an item and scroll to it
                     try {
                         const targetRaw = await AsyncStorage.getItem('cameraReturnTarget');
-                    if (targetRaw) {
+                        if (targetRaw) {
                             const target = JSON.parse(targetRaw);
                             if (target && target.reportId === reportId && target.itemId) {
                                 const idx = tree.findIndex((s: any) => s.id === `item-${target.itemId}`);
@@ -145,93 +135,8 @@ export default function EditorScreen() {
         };
     }, []);
 
-    useEffect(() => {
-        if (activeFloorPath || !sections.length) return;
-        const firstFloor = sections.find((it: any) => it?.type === 'floor' && (it.fullLocation || it.label));
-        const nextPath = firstFloor?.fullLocation || firstFloor?.label || '';
-        if (nextPath) setActiveFloorPath(nextPath);
-    }, [sections, activeFloorPath]);
-
-    const openCameraForItem = (it: any) => {
-        if (!projectId || !reportId) {
-            Alert.alert('שגיאה', 'פרויקט או דוח לא מוגדרים');
-            return;
-        }
-        const url = `/camera?projectId=${encodeURIComponent(String(projectId))}&reportId=${encodeURIComponent(String(reportId))}&itemId=${encodeURIComponent(String(it.id))}&locationName=${encodeURIComponent(it.location || '')}`;
-        router.push(url as any);
-    };
-
-    // Create a new comment window (item) attached to locationPath, persist it, rebuild sections,
-    // scroll to it and open camera for the new item.
-    const createCommentWindowAndOpenCamera = async (locationPath: string) => {
-        const pid = String(projectId || '');
-        const rid = String(reportId || '');
-        if (!pid || !rid) {
-            Alert.alert('שגיאה', 'פרויקט או דוח לא מוגדרים');
-            return;
-        }
-        try {
-            const data = await AsyncStorage.getItem('projects');
-            if (!data) {
-                Alert.alert('שגיאה', 'אין פרויקטים לשמירה');
-                return;
-            }
-            const projects = JSON.parse(data);
-            const projectIndex = projects.findIndex((p: any) => String(p.id) === pid);
-            if (projectIndex < 0) {
-                Alert.alert('שגיאה', 'פרויקט לא נמצא');
-                return;
-            }
-
-            const reports = Array.isArray(projects[projectIndex].reports) ? [...projects[projectIndex].reports] : [];
-            const reportIndex = reports.findIndex((r: any) => String(r.id) === rid);
-            if (reportIndex < 0) {
-                Alert.alert('שגיאה', 'דוח לא נמצא');
-                return;
-            }
-
-            const createdId = `itm-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-            const reportToUpdate = reports[reportIndex];
-            const items = Array.isArray(reportToUpdate.items) ? [...reportToUpdate.items] : [];
-            items.push({ id: createdId, location: locationPath, notes: '', assignedTo: '', images: [] });
-            const updatedReport = { ...reportToUpdate, items };
-            reports[reportIndex] = updatedReport;
-            const updated = [...projects];
-            updated[projectIndex] = { ...projects[projectIndex], reports };
-
-            await AsyncStorage.setItem('projects', JSON.stringify(updated));
-
-            // update local report state
-            setReport(updatedReport);
-            // rebuild sections
-            if (project) {
-                const tree = buildLocationTree(project.structure, updatedReport);
-                // find index of created item
-                const idx = tree.findIndex((s: any) => s.id === `item-${createdId}`);
-                if (idx >= 0 && flatListRef.current) {
-                    setTimeout(() => {
-                        try {
-                            flatListRef.current?.scrollToIndex({ index: idx, animated: true, viewPosition: 0.5 });
-                        } catch (e) {
-                            const layout = getItemLayout(tree, idx);
-                            flatListRef.current?.scrollToOffset({ offset: layout.offset, animated: true });
-                        }
-                        startFlash(`item-${createdId}`);
-                    }, 300);
-                }
-            }
-
-            // navigate to camera for the created item
-            try {
-                router.push({ pathname: '/camera', params: { projectId: pid, reportId: rid, itemId: createdId, locationName: locationPath } });
-            } catch (e) {
-                const qs = `?projectId=${encodeURIComponent(pid)}&reportId=${encodeURIComponent(rid)}&itemId=${encodeURIComponent(createdId)}&locationName=${encodeURIComponent(locationPath)}`;
-                router.push((`/camera${qs}`) as any);
-            }
-        } catch (e) {
-            console.error('Failed to create comment window and open camera', e);
-            Alert.alert('שגיאה', 'נכשל ביצירת ליקוי');
-        }
+    const openReviewPage = () => {
+        router.push(`/review?projectId=${encodeURIComponent(String(projectId))}&reportId=${encodeURIComponent(String(reportId))}` as any);
     };
 
     const openCameraForLocation = (locationName: string) => {
@@ -460,22 +365,6 @@ export default function EditorScreen() {
         return walkTree;
     };
 
-    const scrollToLocation = (index: number) => {
-        setNavVisible(false);
-        setTimeout(() => {
-            if (flatListRef.current && sections[index]) {
-                const targetId = sections[index].id;
-                try {
-                    flatListRef.current.scrollToIndex({ index, animated: true, viewPosition: 0.5 });
-                } catch (e) {
-                    const layout = getItemLayout(sections, index);
-                    flatListRef.current.scrollToOffset({ offset: layout.offset, animated: true });
-                }
-                startFlash(targetId);
-            }
-        }, 350);
-    };
-
     const deleteCommentWindow = async (itemId: string) => {
         try {
             // update storage
@@ -525,35 +414,18 @@ export default function EditorScreen() {
             <View style={styles.topBar}>
                 <View style={styles.topBarMain}>
                     <View style={styles.topBarActionArea}>
-                        {activeFloorPath ? (
-                            <TouchableOpacity
-                                style={styles.stickyActionRow}
-                                onPress={() => createCommentWindowAndOpenCamera(activeFloorPath)}
-                            >
-                                <Ionicons name="camera" size={18} color="white" />
-                                <Text style={styles.stickyActionText} numberOfLines={2}>
-                                    {formatFloorPath(activeFloorPath)}
-                                </Text>
-                            </TouchableOpacity>
-                        ) : null}
+                        <TouchableOpacity style={styles.reviewBtn} onPress={openReviewPage}>
+                            <Text style={styles.reviewBtnText}>סקירת ליקויים</Text>
+                            {(report?.items?.length || 0) > 0 && (
+                                <View style={styles.reviewBadge}>
+                                    <Text style={styles.reviewBadgeText}>{report.items.length}</Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
                     </View>
 
                     <View style={styles.headerInfo}>
                         <View style={styles.headerRow}>
-                            <TouchableOpacity onPress={() => setNavVisible(true)}>
-                                <Ionicons name="menu" size={28} color="#007AFF" />
-                            </TouchableOpacity>
-                            <TouchableOpacity
-                                style={styles.reviewBtn}
-                                onPress={() => router.push(`/review?projectId=${encodeURIComponent(String(projectId))}&reportId=${encodeURIComponent(String(reportId))}` as any)}
-                            >
-                                <Text style={styles.reviewBtnText}>סקירת ליקויים</Text>
-                                {(report?.items?.length || 0) > 0 && (
-                                    <View style={styles.reviewBadge}>
-                                        <Text style={styles.reviewBadgeText}>{report.items.length}</Text>
-                                    </View>
-                                )}
-                            </TouchableOpacity>
                             <View style={{ flex: 1, alignItems: 'flex-end', marginLeft: 15 }}>
                                 <Text style={styles.projectLabel}>{project?.name}</Text>
                                 <TextInput
@@ -584,7 +456,7 @@ export default function EditorScreen() {
                         setShowDatePicker(false);
                         if (date) setReport({ ...report, date: date.toLocaleDateString('he-IL') });
                     }}
-                
+
                 />
             )}
 
@@ -596,7 +468,6 @@ export default function EditorScreen() {
                 keyExtractor={(item) => item.id}
                 getItemLayout={getItemLayout}
                 viewabilityConfig={viewabilityConfigRef.current}
-                onViewableItemsChanged={onViewableItemsChangedRef.current}
                 removeClippedSubviews={false} // עדיף false באנדרואיד למניעת בעיות רינדור
                 initialNumToRender={15}
                 maxToRenderPerBatch={10}
@@ -620,10 +491,6 @@ export default function EditorScreen() {
                                     <View style={{ flexDirection: 'row-reverse', alignItems: 'center' }}>
                                         <TouchableOpacity onPress={() => deleteCommentWindow(liveItem.id)} style={{ marginLeft: 8 }}>
                                             <Ionicons name="trash-outline" size={20} color="#FF3B30" />
-                                        </TouchableOpacity>
-                                        <TouchableOpacity onPress={() => openCameraForItem(liveItem)} style={styles.cameraBtnSmall}>
-                                            <Ionicons name="camera" size={18} color="white" />
-                                            <Text style={styles.cameraBtnTextSmall}>הוסף צילום</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -682,13 +549,13 @@ export default function EditorScreen() {
                     if (item.type === 'comment') {
                         const noteKey = item.noteKey as 'initialNotes' | 'finalNotes';
                         return (
-                            <View style={[styles.commentSection, { marginHorizontal: 0 }]}> 
+                            <View style={[styles.commentSection, { marginHorizontal: 0 }]}>
                                 <Text style={styles.commentLabel}>{item.position === 'start' ? 'פתיחת דוח (הערת פתיחה)' : 'סיום דוח (הערת סיום)'}</Text>
                                 <TextInput
                                     style={styles.commentInput}
                                     multiline
                                     value={report ? (report[noteKey] ?? '') : (item.label ?? '')}
-                                    onChangeText={(txt) => setReport((prev:any) => ({ ...prev, [noteKey]: txt }))}
+                                    onChangeText={(txt) => setReport((prev: any) => ({ ...prev, [noteKey]: txt }))}
                                     onEndEditing={(e) => persistReportField(noteKey, e.nativeEvent.text)}
                                     placeholder={item.position === 'start' ? 'הערת פתיחה לדוח' : 'הערת סיום לדוח'}
                                     textAlign='right'
@@ -756,47 +623,11 @@ export default function EditorScreen() {
                                 <Text style={styles.locationLabelMain}>{item.label}</Text>
                                 {item.fullLocation ? <Text style={styles.locationLabelSub}>{item.fullLocation}</Text> : null}
                             </View>
-                            <TouchableOpacity
-                                style={styles.cameraBtn}
-                                onPress={() => openCameraForLocation(item.fullLocation || item.label)}
-                            >
-                                <Ionicons name="camera" size={18} color="white" />
-                            </TouchableOpacity>
                         </View>
                     );
                 }}
             />
 
-            {/* Modal ניווט */}
-            <Modal visible={isNavVisible} animationType="slide" transparent={true}>
-                <View style={styles.navOverlay}>
-                    <TouchableOpacity style={styles.navCloseArea} onPress={() => setNavVisible(false)} />
-                    <View style={styles.navMenu}>
-                        <View style={styles.navHeader}>
-                            <Text style={styles.navTitle}>ניווט מהיר</Text>
-                            <TouchableOpacity onPress={() => setNavVisible(false)}>
-                                <Ionicons name="close" size={28} color="#000" />
-                            </TouchableOpacity>
-                        </View>
-                        <ScrollView style={{ flex: 1 }}>
-                            {sections
-                                .map((s, i) => ({ ...s, _idx: i }))
-                                .filter((s) => s?.type !== 'comment' && s?.type !== 'commentWindow')
-                                .map((item) => (
-                                    <TouchableOpacity
-                                        key={`nav-${item.id}`}
-                                        style={[styles.navItem, item.type === 'header' && styles.navItemHeader]}
-                                        onPress={() => scrollToLocation(item._idx)}
-                                    >
-                                        <Text style={[styles.navItemText, item.type === 'header' && styles.navItemHeaderText]}>
-                                            {item.label}
-                                        </Text>
-                                    </TouchableOpacity>
-                                ))}
-                        </ScrollView>
-                    </View>
-                </View>
-            </Modal>
         </View>
     );
 }
@@ -917,28 +748,6 @@ const styles = StyleSheet.create({
     commentImageSmall: { width: 90, height: 68, borderRadius: 6, marginLeft: 8 },
     commentImagePlaceholder: { width: 120, height: 90, borderRadius: 6, backgroundColor: '#F2F2F7', justifyContent: 'center', alignItems: 'center' },
     highlightedItem: { backgroundColor: '#DFF4FF' },
-    navOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', flexDirection: 'row-reverse' },
-    navCloseArea: { flex: 1 },
-    navMenu: {
-        width: '75%',
-        backgroundColor: '#FFF',
-        paddingTop: Platform.OS === 'ios' ? 60 : 40,
-        borderTopLeftRadius: 20,
-        borderBottomLeftRadius: 20
-    },
-    navHeader: {
-        flexDirection: 'row-reverse',
-        justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingBottom: 10,
-        borderBottomWidth: 1,
-        borderBottomColor: '#F2F2F7'
-    },
-    navTitle: { fontSize: 22, fontWeight: 'bold' },
-    navItem: { flexDirection: 'row-reverse', padding: 15, borderBottomWidth: 1, borderBottomColor: '#F2F2F7' },
-    navItemHeader: { backgroundColor: '#F9F9F9' },
-    navItemText: { fontSize: 17, textAlign: 'right', flex: 1 },
-    navItemHeaderText: { fontWeight: 'bold', color: '#8E8E93' },
     reviewBtn: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#E8F0FF', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, marginLeft: 8 },
     reviewBtnText: { color: '#007AFF', fontWeight: '600', fontSize: 13 },
     reviewBadge: { backgroundColor: '#007AFF', borderRadius: 10, minWidth: 20, height: 20, justifyContent: 'center', alignItems: 'center', marginLeft: 4, paddingHorizontal: 4 },
