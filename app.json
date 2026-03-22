@@ -25,8 +25,7 @@
         "expo-media-library",
         {
           "photosPermission": "Allow Nard to access your photo library to attach defect images.",
-          "savePhotosPermission": "Allow Nard to save defect photos to your gallery for backup and recovery.",
-          "isAccessMediaLocationEnabled": true
+          "savePhotosPermission": "Allow Nard to save defect photos to your gallery for backup and recovery."
         }
       ]
     ],
