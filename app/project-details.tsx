@@ -121,8 +121,13 @@ export default function ProjectDetailsScreen() {
                     children: [new TextRun({ text, rightToLeft: isRtl, bold })],
                 });
 
-            // Header: logo anchored at top-left corner, report meta on the right (RTL)
+            // Header: logo anchored at top-left, spacer in middle, report meta anchored at top-right
             const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+            const headerTextPara = (text: string, bold = false) =>
+                new Paragraph({
+                    alignment: AlignmentType.RIGHT,
+                    children: [new TextRun({ text, rightToLeft: isRtl, bold })],
+                });
             const headerChildren: (Paragraph | Table)[] = [
                 new Table({
                     width: { size: 100, type: WidthType.PERCENTAGE },
@@ -131,7 +136,7 @@ export default function ProjectDetailsScreen() {
                         new TableRow({
                             children: [
                                 new TableCell({
-                                    width: { size: 20, type: WidthType.PERCENTAGE },
+                                    width: { size: 15, type: WidthType.PERCENTAGE },
                                     borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
                                     children: [
                                         new Paragraph({
@@ -147,12 +152,17 @@ export default function ProjectDetailsScreen() {
                                     ],
                                 }),
                                 new TableCell({
-                                    width: { size: 80, type: WidthType.PERCENTAGE },
+                                    width: { size: 55, type: WidthType.PERCENTAGE },
+                                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                                    children: [new Paragraph({ text: '' })],
+                                }),
+                                new TableCell({
+                                    width: { size: 30, type: WidthType.PERCENTAGE },
                                     borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
                                     children: [
-                                        rtlPara(`פרויקט: ${project.name || ''}`, true),
-                                        rtlPara(`נושא: ${title}`),
-                                        rtlPara(`תאריך: ${r.date || ''}`),
+                                        headerTextPara(`פרויקט: ${project.name || ''}`, true),
+                                        headerTextPara(`נושא: ${title}`),
+                                        headerTextPara(`תאריך: ${r.date || ''}`),
                                     ],
                                 }),
                             ],
