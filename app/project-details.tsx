@@ -105,7 +105,7 @@ export default function ProjectDetailsScreen() {
             }
 
             const title = r.subject || `דוח ${r.reportNumber}`;
-            const isRtl = false;
+            const isRtl = true;
             const docAlignment = isRtl ? AlignmentType.RIGHT : AlignmentType.LEFT;
             const rtlPara = (text: string, bold = false) =>
                 new Paragraph({
@@ -121,17 +121,22 @@ export default function ProjectDetailsScreen() {
                     children: [new TextRun({ text, rightToLeft: isRtl, bold })],
                 });
 
-            // Header with logo on the left and report meta on the right
+            // Header: logo anchored at top-left, spacer in middle, report meta anchored at top-right
             const noBorder = { style: BorderStyle.NONE, size: 0, color: 'FFFFFF' };
+            const headerTextPara = (text: string, bold = false) =>
+                new Paragraph({
+                    alignment: AlignmentType.RIGHT,
+                    children: [new TextRun({ text, rightToLeft: isRtl, bold })],
+                });
             const headerChildren: (Paragraph | Table)[] = [
                 new Table({
-                    width: { size: 45, type: WidthType.PERCENTAGE },
+                    width: { size: 100, type: WidthType.PERCENTAGE },
                     borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder, insideHorizontal: noBorder, insideVertical: noBorder },
                     rows: [
                         new TableRow({
                             children: [
                                 new TableCell({
-                                    width: { size: 25, type: WidthType.PERCENTAGE },
+                                    width: { size: 15, type: WidthType.PERCENTAGE },
                                     borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
                                     children: [
                                         new Paragraph({
@@ -147,12 +152,17 @@ export default function ProjectDetailsScreen() {
                                     ],
                                 }),
                                 new TableCell({
-                                    width: { size: 75, type: WidthType.PERCENTAGE },
+                                    width: { size: 55, type: WidthType.PERCENTAGE },
+                                    borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
+                                    children: [new Paragraph({ text: '' })],
+                                }),
+                                new TableCell({
+                                    width: { size: 30, type: WidthType.PERCENTAGE },
                                     borders: { top: noBorder, bottom: noBorder, left: noBorder, right: noBorder },
                                     children: [
-                                        rtlPara(`פרויקט: ${project.name || ''}`, true),
-                                        rtlPara(`נושא: ${title}`),
-                                        rtlPara(`תאריך: ${r.date || ''}`),
+                                        headerTextPara(`פרויקט: ${project.name || ''}`, true),
+                                        headerTextPara(`נושא: ${title}`),
+                                        headerTextPara(`תאריך: ${r.date || ''}`),
                                     ],
                                 }),
                             ],
