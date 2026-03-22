@@ -415,8 +415,8 @@ export default function EditorScreen() {
             });
         }
 
-        // Walk mode: filter out report-level comment items (opening/closing notes) but keep defect items
-        const walkTree = tree.filter((it: any) => it.type !== 'comment');
+        // Walk mode: show only structural items (headers, floors, parking floors) - no defect cards or notes
+        const walkTree = tree.filter((it: any) => it.type !== 'comment' && it.type !== 'commentWindow');
         setSections(walkTree);
         return walkTree;
     };
