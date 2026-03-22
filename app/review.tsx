@@ -7,6 +7,9 @@ import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 
+const DEFAULT_ITEM_STATUS = 'open';
+const DEFAULT_ITEM_PRIORITY = 'medium';
+
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
     open: { label: 'פתוח', color: '#FF3B30', bg: '#FFE5E5' },
     in_progress: { label: 'בטיפול', color: '#FF9500', bg: '#FFF3E0' },
@@ -227,7 +230,7 @@ export default function ReviewScreen() {
         if (statusFilter === 'all') return sections;
         return sections.filter(s => {
             if (s.type === 'comment') return true;
-            if (s.type === 'commentWindow') return (s.item?.status || 'open') === statusFilter;
+            if (s.type === 'commentWindow') return (s.item?.status || DEFAULT_ITEM_STATUS) === statusFilter;
             return true;
         });
     }, [sections, statusFilter]);
@@ -335,10 +338,10 @@ export default function ReviewScreen() {
                                         <View style={{ flexDirection: 'row-reverse', alignItems: 'center', gap: 6, marginBottom: 2 }}>
                                             <Text style={styles.commentSerial}>ליקוי מס׳: {serial ?? liveItem.id}</Text>
                                             {(() => {
-                                                const s = STATUS_CONFIG[liveItem.status || 'open'];
+                                                const s = STATUS_CONFIG[liveItem.status || DEFAULT_ITEM_STATUS];
                                                 return <View style={{ backgroundColor: s.bg, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 }}><Text style={{ color: s.color, fontSize: 11, fontWeight: '600' }}>{s.label}</Text></View>;
                                             })()}
-                                            {liveItem.priority && liveItem.priority !== 'medium' && PRIORITY_CONFIG[liveItem.priority] && (() => {
+                                            {liveItem.priority && liveItem.priority !== DEFAULT_ITEM_PRIORITY && PRIORITY_CONFIG[liveItem.priority] && (() => {
                                                 const p = PRIORITY_CONFIG[liveItem.priority];
                                                 return <View style={{ backgroundColor: p.bg, borderRadius: 10, paddingHorizontal: 7, paddingVertical: 2 }}><Text style={{ color: p.color, fontSize: 11, fontWeight: '600' }}>{p.label}</Text></View>;
                                             })()}
@@ -427,7 +430,7 @@ export default function ReviewScreen() {
                                             <Text style={styles.commentFieldLabel}>סטטוס:</Text>
                                             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 8, marginTop: 4, flexWrap: 'wrap' }}>
                                                 {Object.entries(STATUS_CONFIG).map(([key, cfg]) => {
-                                                    const current = liveItem.status || 'open';
+                                                    const current = liveItem.status || DEFAULT_ITEM_STATUS;
                                                     return (
                                                         <TouchableOpacity
                                                             key={key}

@@ -8,6 +8,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
 
+const DEFAULT_ITEM_STATUS = 'open';
+const DEFAULT_ITEM_PRIORITY = 'medium';
+
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
     open: { label: 'פתוח', color: '#FF3B30', bg: '#FFE5E5' },
     in_progress: { label: 'בטיפול', color: '#FF9500', bg: '#FFF3E0' },
@@ -28,7 +31,7 @@ const PARKING_SUB_HEIGHT = 28; // small divider for parking floors
 const LOCATION_HEIGHT = 65; // regular clickable rows (building floors / areas)
 const COMMENT_HEIGHT = 120; // start/end comment item
 const COMMENT_WINDOW_HEIGHT = 180; // comment window (likiu) height
-const COMPACT_DEFECT_HEIGHT = 92; // compact defect card shown in walk mode
+const COMPACT_DEFECT_HEIGHT = 110; // compact defect card shown in walk mode (extra height for status/priority badges)
 const MODAL_SAVE_CONFIRMATION_DURATION = 1200; // ms to show "saved" confirmation before closing modal
 
 export default function EditorScreen() {
@@ -53,8 +56,8 @@ export default function EditorScreen() {
     const [modalAssignedTo, setModalAssignedTo] = useState('');
     const [modalSaved, setModalSaved] = useState(false);
     const [modalSerial, setModalSerial] = useState<number | null>(null);
-    const [modalStatus, setModalStatus] = useState<string>('open');
-    const [modalPriority, setModalPriority] = useState<string>('medium');
+    const [modalStatus, setModalStatus] = useState<string>(DEFAULT_ITEM_STATUS);
+    const [modalPriority, setModalPriority] = useState<string>(DEFAULT_ITEM_PRIORITY);
     const [pendingModalItemId, setPendingModalItemId] = useState<string | null>(null);
 
     const formatFloorPath = (path: string) => {
@@ -87,8 +90,8 @@ export default function EditorScreen() {
         setModalItem(item);
         setModalNotes(item.notes || '');
         setModalAssignedTo(item.assignedTo || '');
-        setModalStatus(item.status || 'open');
-        setModalPriority(item.priority || 'medium');
+        setModalStatus(item.status || DEFAULT_ITEM_STATUS);
+        setModalPriority(item.priority || DEFAULT_ITEM_PRIORITY);
         setModalSaved(false);
         // Compute serial once so it doesn't re-run findIndex on every render
         const serial = report?.items
@@ -578,11 +581,11 @@ export default function EditorScreen() {
                                 }
                                 <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: 4, gap: 6 }}>
                                     {(() => {
-                                        const s = STATUS_CONFIG[liveItem.status || 'open'];
+                                        const s = STATUS_CONFIG[liveItem.status || DEFAULT_ITEM_STATUS];
                                         return <View style={{ backgroundColor: s.bg, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}><Text style={{ color: s.color, fontSize: 11, fontWeight: '600' }}>{s.label}</Text></View>;
                                     })()}
                                     {(() => {
-                                        const p = PRIORITY_CONFIG[liveItem.priority || 'medium'];
+                                        const p = PRIORITY_CONFIG[liveItem.priority || DEFAULT_ITEM_PRIORITY];
                                         return <View style={{ backgroundColor: p.bg, borderRadius: 10, paddingHorizontal: 8, paddingVertical: 2 }}><Text style={{ color: p.color, fontSize: 11, fontWeight: '600' }}>{p.label}</Text></View>;
                                     })()}
                                 </View>

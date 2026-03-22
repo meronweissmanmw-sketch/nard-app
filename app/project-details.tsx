@@ -9,6 +9,9 @@ import * as ImageManipulator from 'expo-image-manipulator';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, ImageRun, Table, TableRow, TableCell, Header, AlignmentType, WidthType, BorderStyle } from 'docx';
 import { Buffer } from 'buffer';
 
+const DEFAULT_ITEM_STATUS = 'open';
+const DEFAULT_ITEM_PRIORITY = 'medium';
+
 const STATUS_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
     open: { label: 'פתוח', color: '#FF3B30', bg: '#FFE5E5' },
     in_progress: { label: 'בטיפול', color: '#FF9500', bg: '#FFF3E0' },
@@ -234,8 +237,8 @@ export default function ProjectDetailsScreen() {
                     rows: [
                         makeRow('מיקום:', it.location || '', true),
                         makeRow('אחראי:', it.assignedTo || '', false),
-                        makeRow('סטטוס:', STATUS_CONFIG[it.status || 'open']?.label ?? STATUS_CONFIG.open.label, true),
-                        makeRow('עדיפות:', PRIORITY_CONFIG[it.priority || 'medium']?.label ?? PRIORITY_CONFIG.medium.label, false),
+                        makeRow('סטטוס:', STATUS_CONFIG[it.status || DEFAULT_ITEM_STATUS]?.label ?? STATUS_CONFIG[DEFAULT_ITEM_STATUS].label, true),
+                        makeRow('עדיפות:', PRIORITY_CONFIG[it.priority || DEFAULT_ITEM_PRIORITY]?.label ?? PRIORITY_CONFIG[DEFAULT_ITEM_PRIORITY].label, false),
                         makeRow('הערות:', it.notes || '', true),
                     ],
                 }));
@@ -407,7 +410,7 @@ export default function ProjectDetailsScreen() {
                                 const items = item.items || [];
                                 const total = items.length;
                                 if (total === 0) return <Text style={{ fontSize: 12, color: '#8E8E93', textAlign: 'right', marginTop: 3 }}>אין ליקויים</Text>;
-                                const open = items.filter((it: any) => !it.status || it.status === 'open').length;
+                                const open = items.filter((it: any) => !it.status || it.status === DEFAULT_ITEM_STATUS).length;
                                 const inProg = items.filter((it: any) => it.status === 'in_progress').length;
                                 const fixed = items.filter((it: any) => it.status === 'fixed').length;
                                 return (
