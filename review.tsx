@@ -1,6 +1,6 @@
 ﻿import React, { useState } from 'react';
 import {
-    View, Text, StyleSheet, TouchableOpacity, FlatList, KeyboardAvoidingView,
+    View, Text, StyleSheet, TouchableOpacity, FlatList,
     TextInput, ScrollView, Platform, Image, Alert
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -10,7 +10,6 @@ import { Ionicons } from '@expo/vector-icons';
 export default function ReviewScreen() {
     const router = useRouter();
     const { projectId, reportId } = useLocalSearchParams();
-    const listRef = React.useRef<FlatList<any>>(null);
 
     const [project, setProject] = useState<any>(null);
     const [report, setReport] = useState<any>(null);
@@ -211,7 +210,7 @@ export default function ReviewScreen() {
     const itemCount = report?.items?.length || 0;
 
     return (
-        <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        <View style={styles.container}>
             <View style={styles.topBar}>
                 <View style={styles.topBarRow}>
                     <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
@@ -228,13 +227,11 @@ export default function ReviewScreen() {
             </View>
 
             <FlatList
-                ref={listRef}
                 data={sections}
                 keyExtractor={(item) => item.id}
                 removeClippedSubviews={false}
                 initialNumToRender={15}
-                keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{ paddingBottom: 140 }}
+                contentContainerStyle={{ paddingBottom: 20 }}
                 renderItem={({ item }) => {
                     if (item.type === 'comment') {
                         const noteKey = item.noteKey as 'initialNotes' | 'finalNotes';
@@ -245,11 +242,6 @@ export default function ReviewScreen() {
                                     style={styles.commentInput}
                                     multiline
                                     value={report ? (report[noteKey] ?? '') : (item.label ?? '')}
-                                    onFocus={() => {
-                                        if (item.position === 'end') {
-                                            requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
-                                        }
-                                    }}
                                     onChangeText={(txt) => setReport((prev: any) => ({ ...prev, [noteKey]: txt }))}
                                     onEndEditing={(e) => persistReportField(noteKey, e.nativeEvent.text)}
                                     placeholder={item.position === 'start' ? 'הערת פתיחה לדוח' : 'הערת סיום לדוח'}
@@ -289,6 +281,10 @@ export default function ReviewScreen() {
                                             <Ionicons name="trash-outline" size={18} color="#FF3B30" />
                                             <Text style={styles.deleteBtnText}>מחק</Text>
                                         </TouchableOpacity>
+                                        <TouchableOpacity onPress={() => toggleExpand(liveItem.id)} style={styles.editBtn}>
+                                            <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color="#FFF" />
+                                            <Text style={styles.editBtnText}>{isExpanded ? 'סגור' : 'עריכה'}</Text>
+                                        </TouchableOpacity>
                                     </View>
                                     <View style={styles.collapsedCenter}>
                                         <Text style={styles.commentSerial}>ליקוי מס׳: {serial ?? liveItem.id}</Text>
@@ -306,10 +302,6 @@ export default function ReviewScreen() {
                                                 <Ionicons name="image-outline" size={22} color="#CCC" />
                                             </View>
                                         )}
-                                        <TouchableOpacity onPress={() => toggleExpand(liveItem.id)} style={styles.editBtn}>
-                                            <Ionicons name={isExpanded ? 'chevron-up' : 'chevron-down'} size={18} color="#FFF" />
-                                            <Text style={styles.editBtnText}>{isExpanded ? 'סגור' : 'עריכה'}</Text>
-                                        </TouchableOpacity>
                                     </View>
                                 </View>
 
@@ -398,7 +390,7 @@ export default function ReviewScreen() {
                     return null;
                 }}
             />
-        </KeyboardAvoidingView>
+        </View>
     );
 }
 
@@ -425,8 +417,8 @@ const styles = StyleSheet.create({
     commentWindow: { backgroundColor: '#FFF', padding: 12, marginHorizontal: 12, marginTop: 10, borderRadius: 8, borderWidth: 1, borderColor: '#EEE' },
     commentWindowHeader: { flexDirection: 'row-reverse', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 },
     commentSerial: { fontWeight: '700', fontSize: 15 },
-    collapsedRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-    collapsedRight: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    collapsedRow: { flexDirection: 'row-reverse', alignItems: 'center', justifyContent: 'space-between' },
+    collapsedRight: { marginLeft: 8 },
     collapsedCenter: { flex: 1, alignItems: 'flex-end', paddingHorizontal: 8 },
     collapsedLeft: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     collapsedSummary: { fontSize: 12, color: '#8E8E93', marginTop: 2, textAlign: 'right' },

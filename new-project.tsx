@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react'; import {
     View, Text, StyleSheet, TextInput, TouchableOpacity,
-    ScrollView, Switch, Alert, KeyboardAvoidingView, Platform
+    ScrollView, Switch, Alert
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -78,12 +78,7 @@ export default function NewProjectScreen() {
     };
 
     return (
-        <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <ScrollView
-            style={styles.container}
-            keyboardShouldPersistTaps="handled"
-            contentContainerStyle={{ paddingBottom: 120 }}
-        >
+        <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 60 }}>
             <Text style={styles.title}>הקמת פרויקט חדש</Text>
 
             {/* פרטי זיהוי */}
@@ -193,7 +188,6 @@ export default function NewProjectScreen() {
 
             <TouchableOpacity style={styles.submitBtn} onPress={handleCreate}><Text style={styles.submitBtnText}>צור פרויקט</Text></TouchableOpacity>
         </ScrollView>
-        </KeyboardAvoidingView>
     );
 }
 
