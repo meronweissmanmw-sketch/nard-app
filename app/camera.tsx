@@ -10,7 +10,6 @@ import { useProject } from '../ProjectContext';
 
 export default function CameraScreen() {
     const [permission, requestPermission] = useCameraPermissions();
-    const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions({ granularPermissions: ['photo', 'video'] });
     const cameraRef = useRef<any>(null);
     const router = useRouter();
     const { projectId, reportId, itemId, locationName } = useLocalSearchParams(); // itemId עשוי להיות undefined
@@ -43,8 +42,8 @@ export default function CameraScreen() {
 
             // Save photo to device gallery for backup/recovery
             try {
-                const granted = mediaPermission?.granted || (await requestMediaPermission())?.granted;
-                if (granted) {
+                const permResult = await MediaLibrary.requestPermissionsAsync();
+                if (permResult.granted) {
                     await MediaLibrary.saveToLibraryAsync(photo.uri);
                 }
             } catch (e) {
