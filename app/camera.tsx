@@ -42,9 +42,11 @@ export default function CameraScreen() {
 
             // Save photo to device gallery for backup/recovery
             try {
-                const permResult = await MediaLibrary.requestPermissionsAsync();
-                if (permResult.granted) {
-                    await MediaLibrary.saveToLibraryAsync(photo.uri);
+                if (await MediaLibrary.isAvailableAsync()) {
+                    const permResult = await MediaLibrary.requestPermissionsAsync(false, ['photo']);
+                    if (permResult.granted) {
+                        await MediaLibrary.saveToLibraryAsync(photo.uri);
+                    }
                 }
             } catch (e) {
                 console.warn('Failed to save photo to device gallery', e);
