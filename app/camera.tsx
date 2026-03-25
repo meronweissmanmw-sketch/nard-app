@@ -10,7 +10,7 @@ import { useProject } from '../ProjectContext';
 
 export default function CameraScreen() {
     const [permission, requestPermission] = useCameraPermissions();
-    const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions();
+    const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions({ granularPermissions: ['photo'] });
     const cameraRef = useRef<any>(null);
     const router = useRouter();
     const { projectId, reportId, itemId, locationName } = useLocalSearchParams(); // itemId עשוי להיות undefined
