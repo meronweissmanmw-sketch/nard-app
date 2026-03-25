@@ -1,7 +1,7 @@
-﻿// nard-app/app/camera.tsx
+// nard-app/app/camera.tsx
 
-import React, { useState, useRef } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Alert, Image } from 'react-native';
+import React, { useState, useRef, useEffect } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, Alert } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -10,11 +10,20 @@ import { useProject } from '../ProjectContext';
 
 export default function CameraScreen() {
     const [permission, requestPermission] = useCameraPermissions();
+    const [mediaPermission, requestMediaPermission] = MediaLibrary.usePermissions({ granularPermissions: ['photo'] });
     const cameraRef = useRef<any>(null);
     const router = useRouter();
     const { projectId, reportId, itemId, locationName } = useLocalSearchParams(); // itemId עשוי להיות undefined
     const { addProjectItem } = useProject();
     const [isCapturing, setIsCapturing] = useState(false);
+
+    // Request gallery permission when the camera screen first opens so the
+    // native dialog appears before the user takes a photo.
+    useEffect(() => {
+        if (mediaPermission && !mediaPermission.granted && mediaPermission.canAskAgain) {
+            requestMediaPermission();
+        }
+    }, [mediaPermission, requestMediaPermission]);
 
     if (!permission) return <View />;
     if (!permission.granted) {
@@ -40,13 +49,13 @@ export default function CameraScreen() {
                 skipProcessing: false,
             });
 
-            // Save photo to device gallery for backup/recovery
+            // Save photo to device gallery for backup/recovery.
+            // Permission was requested proactively on mount via useEffect.
+            // Only attempt save if permission is already granted — do not ask again here
+            // because a second requestMediaPermission() call throws in Expo Go (Android 13+).
             try {
-                if (await MediaLibrary.isAvailableAsync()) {
-                    const permResult = await MediaLibrary.requestPermissionsAsync(false, ['photo']);
-                    if (permResult.granted) {
-                        await MediaLibrary.saveToLibraryAsync(photo.uri);
-                    }
+                if (mediaPermission?.granted && await MediaLibrary.isAvailableAsync()) {
+                    await MediaLibrary.saveToLibraryAsync(photo.uri);
                 }
             } catch (e) {
                 console.warn('Failed to save photo to device gallery', e);
@@ -111,36 +120,36 @@ export default function CameraScreen() {
 
     return (
         <View style={styles.container}>
+            {/* CameraView must not have children — use an absolutely-positioned overlay instead */}
             <CameraView
-                style={styles.camera}
+                style={StyleSheet.absoluteFill}
                 ref={cameraRef}
                 facing="back"
-            >
-                <View style={styles.overlay}>
-                    {/* כפתור חזרה */}
-                    <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-                        <Text style={styles.backButtonText}>✕</Text>
-                    </TouchableOpacity>
+            />
+            <View style={styles.overlay}>
+                {/* כפתור חזרה */}
+                <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+                    <Text style={styles.backButtonText}>✕</Text>
+                </TouchableOpacity>
 
-                    {/* חיווי אם מוסיפים לתמונה קיימת או יוצרים חדשה */}
-                    <View style={styles.infoBadge}>
-                        <Text style={styles.infoText}>
-                            {itemId ? "הוספת תמונה לליקוי קיים" : "צילום ליקוי חדש"}
-                        </Text>
-                    </View>
-
-                    {/* כפתור צילום */}
-                    <View style={styles.buttonContainer}>
-                        <TouchableOpacity
-                            style={[styles.captureButton, isCapturing && { opacity: 0.5 }]}
-                            onPress={takePicture}
-                            disabled={isCapturing} // מנטרל את הלחיצה ברמת הרכיב
-                        >
-                            <View style={styles.captureButtonInner} />
-                        </TouchableOpacity>
-                    </View>
+                {/* חיווי אם מוסיפים לתמונה קיימת או יוצרים חדשה */}
+                <View style={styles.infoBadge}>
+                    <Text style={styles.infoText}>
+                        {itemId ? "הוספת תמונה לליקוי קיים" : "צילום ליקוי חדש"}
+                    </Text>
                 </View>
-            </CameraView>
+
+                {/* כפתור צילום */}
+                <View style={styles.buttonContainer}>
+                    <TouchableOpacity
+                        style={[styles.captureButton, isCapturing && { opacity: 0.5 }]}
+                        onPress={takePicture}
+                        disabled={isCapturing} // מנטרל את הלחיצה ברמת הרכיב
+                    >
+                        <View style={styles.captureButtonInner} />
+                    </TouchableOpacity>
+                </View>
+            </View>
         </View>
     );
 }
@@ -148,8 +157,7 @@ export default function CameraScreen() {
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#000' },
     message: { textAlign: 'center', color: '#fff', marginBottom: 20, fontSize: 16 },
-    camera: { flex: 1 },
-    overlay: { flex: 1, backgroundColor: 'transparent', justifyContent: 'space-between', padding: 30 },
+    overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'space-between', padding: 30 },
     permissionButton: { backgroundColor: '#007AFF', padding: 15, borderRadius: 10, alignSelf: 'center' },
     permissionButtonText: { color: '#fff', fontWeight: 'bold' },
     backButton: { width: 40, height: 40, backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginTop: 20 },
