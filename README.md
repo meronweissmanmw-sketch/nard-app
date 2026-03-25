@@ -35,6 +35,7 @@ nard-app/                    ← repo root — open this folder in VS Code / ter
 ├── nard.esproj             Visual Studio JS project file
 ├── package.json            npm dependencies
 ├── app.json                Expo configuration
+├── eas.json                EAS Build profiles (preview / production) and submit config
 ├── tsconfig.json           TypeScript configuration
 ├── babel.config.js         Babel configuration
 ├── ProjectContext.tsx      Shared state (projects, createNewProject, addProjectItem)
@@ -147,6 +148,10 @@ After the build finishes, EAS prints a URL. Download the `.apk` / `.ipa` and:
 2. Create a new app in the Console — choose "App" → "Android App" → fill in details.
 3. Generate a **Service Account** key (JSON) with *Release Manager* permissions and save it as `google-service-account.json` in the project root directory (**never commit this file — it is already in `.gitignore`**).
 4. Update `eas.json` → `submit.production.android.serviceAccountKeyPath` with the correct path.
+   > **CI/CD alternative:** store the key contents as an EAS Secret instead of a local file:
+   > ```bash
+   > eas secret:create --scope project --name GOOGLE_SERVICE_ACCOUNT_KEY --value "$(cat google-service-account.json)"
+   > ```
 5. Run:
    ```bash
    npm run build:android:prod   # builds a signed .aab
@@ -159,6 +164,11 @@ After the build finishes, EAS prints a URL. Download the `.apk` / `.ipa` and:
 1. Enroll in the [Apple Developer Program](https://developer.apple.com/programs/) ($99/yr).
 2. Create an App record in [App Store Connect](https://appstoreconnect.apple.com).
 3. Fill in `eas.json` → `submit.production.ios` with your `appleId`, `ascAppId`, and `appleTeamId`.
+   > **CI/CD alternative:** store credentials as EAS Secrets to avoid keeping them in the file:
+   > ```bash
+   > eas secret:create --scope project --name EXPO_APPLE_ID --value "your@apple.id"
+   > eas secret:create --scope project --name EXPO_ASC_APP_ID --value "1234567890"
+   > ```
 4. Run:
    ```bash
    npm run build:ios:prod   # builds a signed .ipa
