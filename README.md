@@ -27,6 +27,47 @@ Then:
 
 ---
 
+## 📲 Share the app with testers (fastest path)
+
+### Option A — Expo Go (zero build time, works today)
+
+1. Start the dev server: press **▶ in VS 2026** (or run `npx expo start` in a terminal).
+2. The terminal shows a **QR code**.
+3. The tester installs **Expo Go** on their phone:
+   - Android: [Google Play](https://play.google.com/store/apps/details?id=host.exp.exponent)
+   - iPhone: [App Store](https://apps.apple.com/app/expo-go/id982107779)
+4. **Android** — open Expo Go and tap *Scan QR Code*.  
+   **iPhone** — use the system Camera app to scan the QR code.
+5. The app opens instantly on their phone. ✅
+
+> ⚠️ Both the tester's phone and your computer must be on the **same Wi-Fi network**.  
+> If they are not, press **`t`** in the terminal to switch to *tunnel* mode — the QR code will work over the internet.
+
+---
+
+### Option B — Standalone APK (Android, no store needed)
+
+Send a single `.apk` file that testers install like any Android app.
+
+```bash
+# One-time setup (skip if already done)
+npm install -g eas-cli
+eas login              # create a free account at https://expo.dev/signup
+eas build:configure    # link this project to your Expo account
+
+# Build the APK (takes ~5–10 min on EAS cloud servers)
+npm run build:android:preview
+```
+
+When the build finishes, EAS prints a **download URL**.  
+Send that URL to your testers — they open it on their Android phone, download the `.apk`, and install it.
+
+> The first time Android will ask them to allow *"Install from unknown sources"* — this is normal for apps distributed outside the Play Store.
+
+See the **[📦 Building a standalone app](#-building-a-standalone-app-apk--ipa)** section below for iOS and production builds.
+
+---
+
 ## 📁 Project structure
 
 ```
@@ -54,11 +95,15 @@ nard-app/                    ← repo root — open this folder in VS Code / ter
 
 ---
 
-## 🖥️ Opening in Visual Studio 2026
+## 🖥️ Opening & Running in Visual Studio 2026
 
 1. Double-click **`Nard.slnx`** — Visual Studio opens the solution.
-2. The project is already configured to run `npx expo start` when you press **F5**.
-3. GitHub Copilot works inline in every file — type code and press **Tab** to accept suggestions, **Esc** to reject.
+2. Press the **green ▶ Start button** (or **F5**) in the toolbar.
+   - VS 2026 runs `npx expo start` automatically — a terminal window opens and a **QR code** appears.
+3. **Scan the QR code** with the **Expo Go** app on your phone to instantly see the running app.
+4. GitHub Copilot works inline in every file — type code and press **Tab** to accept suggestions, **Esc** to reject.
+
+> **Tip:** The ▶ button in VS 2026 is located in the top toolbar next to the configuration dropdown (where it usually says *"Debug"* or *"Any CPU"*). For this project it simply starts the Expo development server — no build step is required.
 
 ---
 
