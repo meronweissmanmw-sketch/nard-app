@@ -16,6 +16,12 @@ ios/
 .env.local
 .env.*.local
 
+# EAS / store credentials (never commit these)
+google-service-account.json
+*.p8
+*.p12
+*.mobileprovision
+
 # Logs
 npm-debug.log*
 yarn-debug.log*
